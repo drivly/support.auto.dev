@@ -18,6 +18,7 @@ The goal is to formalize the entire business domain so that:
 - [Support](domains/support.md) — customer support requests
 - [Feature Requests](domains/feature-requests.md) — product feedback loop from support
 - [Vehicle Data](domains/vehicle-data.md) — vehicle taxonomy, provider ID mapping (from Vindex NORMA model)
+- [Error Monitoring](domains/error-monitoring.md) — proactive error detection and resolution
 
 ## State Machines
 
@@ -26,3 +27,4 @@ The goal is to formalize the entire business domain so that:
 - [Support Request Lifecycle](state-machines/support-request-lifecycle.md) — Received → Triaging → Investigating → Resolved → Closed
 - [Feature Request Lifecycle](state-machines/feature-request-lifecycle.md) — Proposed → Investigating → Approved → InProgress → Shipped → Closed
 - [Connect Session](state-machines/connect-session.md) — Pending → Success | Error | Cancelled
+- [Error Monitoring](state-machines/error-monitoring.md) — Monitoring → Detected → Investigating → AutoResolved | Escalated → Resolved
