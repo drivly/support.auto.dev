@@ -1,63 +1,64 @@
 # Multi-Tenancy Design — Domain-Scoped GraphDL
 
 **Date:** 2026-03-02
-**Context:** GraphDL needs to serve multiple users, each with their own isolated domain models, on a shared MongoDB instance. Tenancy is expressed as readings — not bolted-on infrastructure.
+**Context:** GraphDL needs to serve multiple users, each with their own isolated domain models, on a shared MongoDB instance.
 
 ## Decisions
 
 - **Tenant boundary:** Per API key (auth.vin user). No organization entity for now.
-- **Isolation:** Domain entity in graphdl-orm. Top-level ORM primitives belong to a Domain. Child entities inherit scope through their parent.
+- **Isolation:** Domain entity scopes all ORM primitives. Child entities inherit scope through their parent.
 - **API surface:** High-level readings API on apis/ + raw Payload REST as escape hatch.
-- **Domain dependencies:** Domains can depend on other domains (as libraries). Public domains are importable by any user. Private domains are owner-only.
+- **Domain dependencies:** Domains can depend on other domains (as libraries). Public domains are importable by any user.
 
-## Domain: Tenancy & Domains
+## Separation of Concerns
 
-### Entity Types
+Two separate sets of changes:
 
-| Entity | Reference Scheme | Notes |
-|--------|-----------------|-------|
-| Domain | Customer + DomainSlug | A user's isolated application/model space |
+### 1. auto.dev-graphdl (the application domain model)
 
-### Value Types
-
-| Value | Type | Constraints |
-|-------|------|------------|
-| DomainSlug | string | pattern: [a-z0-9-]+ |
-| DomainDescription | string | |
-| DomainVisibility | string | enum: private, public |
-
-### Readings
+Business-level readings about what a Domain IS:
 
 | # | Reading | Multiplicity |
 |---|---------|-------------|
 | 130 | Customer has Domain | 1:* |
 | 131 | Domain has DomainDescription | *:1 |
 | 132 | Domain has DomainVisibility | *:1 |
-| 133 | Noun belongs to Domain | *:1 |
-| 134 | Reading belongs to Domain | *:1 |
-| 135 | GraphSchema belongs to Domain | *:1 |
-| 136 | StateMachineDefinition belongs to Domain | *:1 |
-| 137 | Generator belongs to Domain | *:1 |
-| 138 | Domain depends on Domain | *:* |
+| 133 | Domain depends on Domain | *:* |
+
+These describe the product: customers create domains, domains have descriptions and visibility, domains can depend on other domains. This is the same kind of reading as "Customer submits SupportRequest."
+
+### 2. graphdl-orm (the framework)
+
+Built-in framework feature: every top-level ORM primitive is domain-scoped.
+
+- Noun belongs to a Domain
+- Reading belongs to a Domain
+- GraphSchema belongs to a Domain
+- StateMachineDefinition belongs to a Domain
+- Generator belongs to a Domain
+
+These are NOT readings in the application domain model. They are structural changes to graphdl-orm itself — the framework knows about Domains natively. A customer using GraphDL to model their app should not see "Noun belongs to Domain" in their schema; it's infrastructure.
+
+Implementation: add a `domain` relationship field to these 5 collections in graphdl-orm's source code, with access control that filters by domain ownership. This is a framework concern, not a domain concern.
 
 ## What This Produces
 
-The generator turns these 9 readings into:
+**From the application readings (auto.dev-graphdl):**
+- Domains collection with `customer` (relationship), `domainSlug` (text), `domainDescription` (text), `domainVisibility` (select: private/public)
+- Domain dependency M:M relationship
 
-- **Domains collection** with `customer` (relationship), `domainSlug` (text, unique per customer), `domainDescription` (text), `domainVisibility` (select: private/public)
-- **`domain` relationship field** on Nouns, Readings, GraphSchemas, StateMachineDefinitions, Generators
-- **`domainDependsOnDomain` M:M** — the dependency graph between domains
-- **Access control** scoping all reads/writes: user sees only their own domains, plus public domains they depend on
+**From the framework changes (graphdl-orm):**
+- `domain` relationship field on Nouns, Readings, GraphSchemas, StateMachineDefinitions, Generators
+- Access control scoping all reads/writes by domain ownership
+- Noun resolution across domain dependencies
 
 ## Noun Resolution Across Dependencies
 
-When a domain depends on another, its readings can reference nouns from the dependency. The generator resolves nouns across the dependency chain:
+When a domain depends on another, its readings can reference nouns from the dependency:
 
 1. Readings in "support-app" reference "Customer" (defined in "auth" domain)
 2. Generator walks the dependency graph: support-app → auth
 3. Customer noun is found in the auth domain and used to resolve the reading
-
-This means the OpenAPI/Payload/XState output for "support-app" includes Customer-related schemas inherited from "auth."
 
 ## API Surface on apis/
 
@@ -84,16 +85,16 @@ GET    /graphdl/library                      → browse public domains
 ### Raw Payload Escape Hatch
 
 ```
-GET/POST/PATCH /graphdl/raw/nouns            → proxied to Payload /api/nouns with tenant+domain filter
+GET/POST/PATCH /graphdl/raw/nouns            → proxied to Payload /api/nouns with domain filter
 GET/POST/PATCH /graphdl/raw/graph-schemas    → proxied to Payload /api/graph-schemas
-... (all 22 collections)
+... (all collections)
 ```
 
 ## Implementation Sequence
 
-1. Add tenancy domain readings to `auto.dev-graphdl/domains/tenancy.md`
-2. Seed tenancy readings into graphdl-orm alongside existing domains
-3. Verify the generator produces the Domain collection and domain fields on existing collections
-4. Add domain-aware access control to graphdl-orm
+1. Add application-level tenancy readings to `auto.dev-graphdl/domains/tenancy.md` (done)
+2. Add `domain` field to graphdl-orm's 5 top-level collections (framework change)
+3. Add domain-aware access control to graphdl-orm
+4. Seed tenancy readings + existing domains, verify generator output
 5. Add `/graphdl/*` routes to apis/ Worker
 6. Wire the high-level readings API to Payload REST calls with domain scoping
