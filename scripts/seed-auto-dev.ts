@@ -1,34 +1,76 @@
 /**
- * Seed all auto.dev-graphdl domain readings into GraphDL ORM and run generators.
+ * Seed all auto.dev-graphdl domain readings into a running GraphDL ORM instance.
  *
- * Usage: npx tsx scripts/seed-auto-dev.ts
+ * Usage: GRAPHDL_URL=http://localhost:3000 npx tsx scripts/seed-auto-dev.ts
  *
- * Run from the graphdl-orm directory:
- *   cd ../graphdl-orm && npx tsx ../auto.dev-graphdl/scripts/seed-auto-dev.ts
- *
- * Expects DATABASE_URI in .env (or environment) pointing at a fresh MongoDB.
+ * Requires a running graphdl-orm server. This script is a pure HTTP client —
+ * it does not import or depend on any graphdl-orm internals.
  */
 
-import { getPayload, type Payload } from 'payload'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+const BASE_URL = process.env.GRAPHDL_URL || 'http://localhost:3000'
+const API = `${BASE_URL}/api`
+
+// ─── HTTP Helpers ───────────────────────────────────────────────────────────
+
+async function post(collection: string, data: Record<string, any>): Promise<any> {
+  const res = await fetch(`${API}/${collection}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`POST /api/${collection} ${res.status}: ${body}`)
+  }
+  return res.json().then((r: any) => r.doc)
+}
+
+async function patch(collection: string, id: string, data: Record<string, any>): Promise<any> {
+  const res = await fetch(`${API}/${collection}/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`PATCH /api/${collection}/${id} ${res.status}: ${body}`)
+  }
+  return res.json().then((r: any) => r.doc)
+}
+
+async function find(collection: string, where: Record<string, any>): Promise<any[]> {
+  const params = new URLSearchParams()
+  for (const [field, condition] of Object.entries(where)) {
+    for (const [op, val] of Object.entries(condition as Record<string, any>)) {
+      params.set(`where[${field}][${op}]`, String(val))
+    }
+  }
+  const res = await fetch(`${API}/${collection}?${params}`)
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`GET /api/${collection} ${res.status}: ${body}`)
+  }
+  return res.json().then((r: any) => r.docs)
+}
+
+// ─── Domain Helpers ─────────────────────────────────────────────────────────
 
 const nounCache = new Map<string, any>()
 
-async function ensureNoun(payload: Payload, data: Record<string, any>) {
+async function ensureNoun(data: Record<string, any>): Promise<any> {
   if (nounCache.has(data.name)) return nounCache.get(data.name)
-  const existing = (await payload.find({ collection: 'nouns', where: { name: { equals: data.name } } })).docs[0]
-  if (existing) {
-    nounCache.set(data.name, existing)
-    return existing
+  const existing = await find('nouns', { name: { equals: data.name } })
+  if (existing.length) {
+    nounCache.set(data.name, existing[0])
+    return existing[0]
   }
-  const noun = await payload.create({ collection: 'nouns', data })
+  const noun = await post('nouns', data)
   nounCache.set(data.name, noun)
   return noun
 }
@@ -39,10 +81,10 @@ function nounId(name: string): string {
   return n.id
 }
 
-async function createFact(payload: Payload, name: string, text: string, relationship: string) {
-  const schema = await payload.create({ collection: 'graph-schemas', data: { name } })
-  await payload.create({ collection: 'readings', data: { text, graphSchema: schema.id } })
-  await payload.update({ collection: 'graph-schemas', id: schema.id, data: { roleRelationship: relationship } })
+async function createFact(name: string, text: string, relationship: string) {
+  const schema = await post('graph-schemas', { name })
+  await post('readings', { text, graphSchema: schema.id })
+  await patch('graph-schemas', schema.id, { roleRelationship: relationship })
   return schema
 }
 
@@ -198,43 +240,28 @@ const valueNouns: ValueNounDef[] = [
 // ─── Entity Nouns (deduplicated across all 9 domains) ───────────────────────
 
 const entityNouns: EntityNounDef[] = [
-  // Customer & Auth
   { name: 'Customer', plural: 'customers', permissions: ['create', 'read', 'update', 'list', 'login'], refScheme: ['EmailAddress'] },
   { name: 'Account', plural: 'accounts', permissions: ['create', 'read', 'update', 'list'], refScheme: ['Customer', 'OAuthProvider'] },
   { name: 'APIKey', plural: 'api-keys', permissions: ['create', 'read', 'update', 'list'], refScheme: ['KeyValue'] },
   { name: 'TwoFactorToken', plural: 'two-factor-tokens', permissions: ['create', 'read', 'update', 'list'], refScheme: ['Customer', 'Token'] },
   { name: 'TwoFactorConfirmation', plural: 'two-factor-confirmations', permissions: ['create', 'read', 'update', 'list'], refScheme: ['Customer'] },
-
-  // Support
   { name: 'SupportRequest', plural: 'support-requests', permissions: ['create', 'read', 'update', 'list'], refScheme: ['RequestId'] },
   { name: 'Message', plural: 'messages', permissions: ['create', 'read', 'update', 'list'], refScheme: ['MessageId'] },
   { name: 'Channel', plural: 'channels', permissions: ['create', 'read', 'update', 'list'], refScheme: ['ChannelName'] },
-
-  // Error Monitoring
   { name: 'ErrorPattern', plural: 'error-patterns', permissions: ['create', 'read', 'update', 'list'], refScheme: ['PatternId'] },
   { name: 'Alert', plural: 'alerts', permissions: ['create', 'read', 'update', 'list'], refScheme: ['AlertId'] },
   { name: 'Fix', plural: 'fixes', permissions: ['create', 'read', 'update', 'list'], refScheme: ['FixId'] },
-
-  // Feature Requests
   { name: 'FeatureRequest', plural: 'feature-requests', permissions: ['create', 'read', 'update', 'list'], refScheme: ['FeatureRequestId'] },
-
-  // API Products
   { name: 'APIProduct', plural: 'api-products', permissions: ['create', 'read', 'update', 'list'], refScheme: ['EndpointSlug'] },
   { name: 'ProductCategory', plural: 'product-categories', permissions: ['create', 'read', 'update', 'list'], refScheme: ['CategoryName'] },
   { name: 'DataProvider', plural: 'data-providers', permissions: ['create', 'read', 'update', 'list'], refScheme: ['ProviderName'] },
   { name: 'MeterEvent', plural: 'meter-events', permissions: ['create', 'read', 'update', 'list'], refScheme: ['IdempotencyKey'] },
-
-  // Plans & Subscriptions
   { name: 'Subscription', plural: 'subscriptions', permissions: ['create', 'read', 'update', 'list'], refScheme: ['SubscriptionId'] },
   { name: 'Plan', plural: 'plans', permissions: ['create', 'read', 'update', 'list'], refScheme: ['PlanName'] },
   { name: 'WebhookEvent', plural: 'webhook-events', permissions: ['create', 'read', 'update', 'list'], refScheme: ['EventId'] },
-
-  // Integrations
   { name: 'Integration', plural: 'integrations', permissions: ['create', 'read', 'update', 'list'], refScheme: ['IntegrationSlug'] },
   { name: 'ConnectedAccount', plural: 'connected-accounts', permissions: ['create', 'read', 'update', 'list'], refScheme: ['Customer', 'Integration'] },
   { name: 'ConnectSession', plural: 'connect-sessions', permissions: ['create', 'read', 'update', 'list'], refScheme: ['SessionToken'] },
-
-  // Vehicle Data
   { name: 'Make', plural: 'makes', permissions: ['create', 'read', 'update', 'list'], refScheme: ['MakeName'] },
   { name: 'MakeModel', plural: 'make-models', permissions: ['create', 'read', 'update', 'list'], refScheme: ['Make', 'ModelName'] },
   { name: 'YearMakeModel', plural: 'year-make-models', permissions: ['create', 'read', 'update', 'list'], refScheme: ['MakeModel', 'Year'] },
@@ -242,15 +269,12 @@ const entityNouns: EntityNounDef[] = [
   { name: 'Specs', plural: 'specs', permissions: ['create', 'read', 'update', 'list'], refScheme: ['SpecsId'] },
   { name: 'Color', plural: 'colors', permissions: ['create', 'read', 'update', 'list'], refScheme: ['ColorId'] },
   { name: 'Option', plural: 'options', permissions: ['create', 'read', 'update', 'list'], refScheme: ['OptionId'] },
-
-  // Domain Evolution
   { name: 'DomainChange', plural: 'domain-changes', permissions: ['create', 'read', 'update', 'list'], refScheme: ['ChangeId'] },
 ]
 
 // ─── Facts (Readings) across all 9 domains ──────────────────────────────────
 
 const facts: FactDef[] = [
-  // Customer & Auth
   { text: 'Customer has Name', multiplicity: '*:1' },
   { text: 'Customer has UserRole', multiplicity: '*:1' },
   { text: 'Customer has APIKey', multiplicity: '1:1' },
@@ -263,8 +287,6 @@ const facts: FactDef[] = [
   { text: 'Account has AccessToken', multiplicity: '*:1' },
   { text: 'Account has RefreshToken', multiplicity: '*:1' },
   { text: 'Account has ExpiresAt', multiplicity: '*:1' },
-
-  // API Products
   { text: 'APIProduct has EndpointPath', multiplicity: '1:1' },
   { text: 'APIProduct has Description', multiplicity: '*:1' },
   { text: 'APIProduct belongs to ProductCategory', multiplicity: '*:1' },
@@ -276,8 +298,6 @@ const facts: FactDef[] = [
   { text: 'MeterEvent is for Customer', multiplicity: '*:1' },
   { text: 'MeterEvent is for APIProduct', multiplicity: '*:1' },
   { text: 'MeterEvent is for Subscription', multiplicity: '*:1' },
-
-  // Plans & Subscriptions
   { text: 'Subscription is on Plan', multiplicity: '*:1' },
   { text: 'Subscription has Interval', multiplicity: '*:1' },
   { text: 'Plan has monthly Price', multiplicity: '1:1' },
@@ -288,8 +308,6 @@ const facts: FactDef[] = [
   { text: 'Subscription has LastPlanChangeAt', multiplicity: '*:1' },
   { text: 'WebhookEvent has EventType', multiplicity: '*:1' },
   { text: 'WebhookEvent has EventStatus', multiplicity: '*:1' },
-
-  // Integrations
   { text: 'Integration has IntegrationType', multiplicity: '*:1' },
   { text: 'Integration has IntegrationName', multiplicity: '1:1' },
   { text: 'Integration has IntegrationStatus', multiplicity: '*:1' },
@@ -301,8 +319,6 @@ const facts: FactDef[] = [
   { text: 'ConnectSession has ConnectUrl', multiplicity: '*:1' },
   { text: 'ConnectSession is for Customer', multiplicity: '*:1' },
   { text: 'ConnectSession is for Integration', multiplicity: '*:1' },
-
-  // Support
   { text: 'Customer submits SupportRequest', multiplicity: '1:*' },
   { text: 'SupportRequest has Subject', multiplicity: '*:1' },
   { text: 'SupportRequest has Description', multiplicity: '*:1' },
@@ -313,8 +329,6 @@ const facts: FactDef[] = [
   { text: 'Message has Body', multiplicity: '*:1' },
   { text: 'Message has SentAt', multiplicity: '*:1' },
   { text: 'Customer sends Message', multiplicity: '1:*' },
-
-  // Error Monitoring
   { text: 'ErrorPattern has Description', multiplicity: '*:1' },
   { text: 'ErrorPattern has ErrorRate', multiplicity: '*:1' },
   { text: 'ErrorPattern has Severity', multiplicity: '*:1' },
@@ -327,20 +341,14 @@ const facts: FactDef[] = [
   { text: 'Fix has Description', multiplicity: '*:1' },
   { text: 'Fix has CodeChange', multiplicity: '*:1' },
   { text: 'ErrorPattern has Fix', multiplicity: '1:*' },
-
-  // Feature Requests
   { text: 'SupportRequest leads to FeatureRequest', multiplicity: '*:1' },
   { text: 'FeatureRequest has Subject', multiplicity: '*:1' },
   { text: 'FeatureRequest has Description', multiplicity: '*:1' },
   { text: 'FeatureRequest has VoteCount', multiplicity: '*:1' },
   { text: 'FeatureRequest concerns APIProduct', multiplicity: '*:*' },
-
-  // Vehicle Data — Taxonomy
   { text: 'Make manufactured Model as MakeModel', multiplicity: '*:*' },
   { text: 'MakeModel was manufactured for Year as YearMakeModel', multiplicity: '*:*' },
   { text: 'YearMakeModel has Trim as YearMakeModelTrim', multiplicity: '1:*' },
-
-  // Vehicle Data — Specs
   { text: 'YearMakeModelTrim has Specs', multiplicity: '1:*' },
   { text: 'Specs has SquishVIN', multiplicity: '*:1' },
   { text: 'Specs has BodyStyle', multiplicity: '*:1' },
@@ -349,8 +357,6 @@ const facts: FactDef[] = [
   { text: 'Specs has engine Option', multiplicity: '*:1' },
   { text: 'Specs has transmission Option', multiplicity: '*:1' },
   { text: 'Specs has drivetrain Option', multiplicity: '*:1' },
-
-  // Vehicle Data — Provider IDs
   { text: 'Make has EdmundsId', multiplicity: '1:1' },
   { text: 'Make has KBBId', multiplicity: '1:1' },
   { text: 'MakeModel has EdmundsId', multiplicity: '1:1' },
@@ -361,8 +367,6 @@ const facts: FactDef[] = [
   { text: 'Specs has ChromeId', multiplicity: '1:1' },
   { text: 'Specs has EdmundsId', multiplicity: '1:1' },
   { text: 'Specs has KBBId', multiplicity: '1:1' },
-
-  // Vehicle Data — Colors & Options
   { text: 'Color has ColorName', multiplicity: '1:1' },
   { text: 'Color has GenericColorName', multiplicity: '*:1' },
   { text: 'Color has HexCode', multiplicity: '1:1' },
@@ -371,8 +375,6 @@ const facts: FactDef[] = [
   { text: 'Option belongs to Specs', multiplicity: '*:1' },
   { text: 'Option has EdmundsId', multiplicity: '1:1' },
   { text: 'Option has KBBId', multiplicity: '1:1' },
-
-  // Domain Evolution
   { text: 'DomainChange has ReadingText', multiplicity: '*:1' },
   { text: 'DomainChange has Rationale', multiplicity: '*:1' },
   { text: 'DomainChange has DomainName', multiplicity: '*:1' },
@@ -482,12 +484,14 @@ const stateMachines: StateMachineDef[] = [
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
-  process.env.PAYLOAD_DISABLE_ADMIN = 'true'
-  if (!process.env.PAYLOAD_SECRET) process.env.PAYLOAD_SECRET = 'seed-script-secret'
-
-  console.log('Initializing Payload...')
-  const { default: config } = await import('../src/payload.config.js')
-  const payload = await getPayload({ config })
+  // Verify server is reachable
+  console.log(`Connecting to GraphDL ORM at ${BASE_URL}...`)
+  try {
+    await fetch(`${API}/nouns?limit=1`)
+  } catch {
+    console.error(`Cannot reach ${BASE_URL}. Is graphdl-orm running? (cd graphdl-orm && npm run dev)`)
+    process.exit(1)
+  }
   console.log('Connected.\n')
 
   // ── 1. Value Nouns ──────────────────────────────────────────────────────
@@ -501,14 +505,14 @@ async function main() {
     if (v.maximum !== undefined) data.maximum = v.maximum
     if (v.minLength !== undefined) data.minLength = v.minLength
     if (v.maxLength !== undefined) data.maxLength = v.maxLength
-    await ensureNoun(payload, data)
+    await ensureNoun(data)
   }
   console.log(`  Done. ${nounCache.size} nouns in cache.\n`)
 
-  // ── 2. Entity Nouns (without refScheme yet) ────────────────────────────
+  // ── 2. Entity Nouns ─────────────────────────────────────────────────────
   console.log(`Creating ${entityNouns.length} entity nouns...`)
   for (const e of entityNouns) {
-    await ensureNoun(payload, {
+    await ensureNoun({
       name: e.name,
       objectType: 'entity',
       plural: e.plural,
@@ -517,19 +521,15 @@ async function main() {
   }
   console.log(`  Done. ${nounCache.size} nouns in cache.\n`)
 
-  // ── 3. Set Reference Schemes ───────────────────────────────────────────
+  // ── 3. Set Reference Schemes ────────────────────────────────────────────
   console.log('Setting reference schemes...')
   for (const e of entityNouns) {
     const refIds = e.refScheme.map(name => nounId(name))
-    await payload.update({
-      collection: 'nouns',
-      id: nounId(e.name),
-      data: { referenceScheme: refIds },
-    })
+    await patch('nouns', nounId(e.name), { referenceScheme: refIds })
   }
   console.log('  Done.\n')
 
-  // ── 4. Facts (Graph Schemas + Readings) ────────────────────────────────
+  // ── 4. Facts (Graph Schemas + Readings) ─────────────────────────────────
   console.log(`Creating ${facts.length} facts...`)
   let created = 0
   let skipped = 0
@@ -542,7 +542,7 @@ async function main() {
     }
     const name = toCamelCase(f.text)
     try {
-      await createFact(payload, name, f.text, rel)
+      await createFact(name, f.text, rel)
       created++
     } catch (err: any) {
       console.log(`  ERROR on "${f.text}": ${err.message}`)
@@ -551,93 +551,74 @@ async function main() {
   }
   console.log(`  Created: ${created}, Skipped/Errors: ${skipped}\n`)
 
-  // ── 5. State Machines ──────────────────────────────────────────────────
+  // ── 5. State Machines ───────────────────────────────────────────────────
   console.log(`Creating ${stateMachines.length} state machines...`)
   for (const sm of stateMachines) {
     console.log(`  ${sm.entityNoun}: ${sm.states.length} states, ${sm.transitions.length} transitions`)
 
-    const definition = await payload.create({
-      collection: 'state-machine-definitions',
-      data: { noun: { relationTo: 'nouns', value: nounId(sm.entityNoun) } },
+    const definition = await post('state-machine-definitions', {
+      noun: { relationTo: 'nouns', value: nounId(sm.entityNoun) },
     })
 
     const statusMap = new Map<string, string>()
     for (const s of sm.states) {
-      const status = await payload.create({
-        collection: 'statuses',
-        data: { name: s, stateMachineDefinition: definition.id },
-      })
+      const status = await post('statuses', { name: s, stateMachineDefinition: definition.id })
       statusMap.set(s, status.id)
     }
 
     const eventTypeMap = new Map<string, string>()
     for (const t of sm.transitions) {
       if (!eventTypeMap.has(t.event)) {
-        const et = await payload.create({
-          collection: 'event-types',
-          data: { name: t.event },
-        })
+        const et = await post('event-types', { name: t.event })
         eventTypeMap.set(t.event, et.id)
       }
     }
 
     for (const t of sm.transitions) {
-      await payload.create({
-        collection: 'transitions',
-        data: {
-          from: statusMap.get(t.from)!,
-          to: statusMap.get(t.to)!,
-          eventType: eventTypeMap.get(t.event)!,
-        },
+      await post('transitions', {
+        from: statusMap.get(t.from),
+        to: statusMap.get(t.to),
+        eventType: eventTypeMap.get(t.event),
       })
     }
   }
   console.log('  Done.\n')
 
-  // ── 6. Run Generators ──────────────────────────────────────────────────
+  // ── 6. Run Generators ───────────────────────────────────────────────────
   console.log('Running OpenAPI generator...')
-  const openapiGen = await payload.create({
-    collection: 'generators',
-    data: {
-      title: 'auto.dev Full API',
-      version: '1.0.0',
-      databaseEngine: 'Payload',
-    },
+  const openapiGen = await post('generators', {
+    title: 'auto.dev Full API',
+    version: '1.0.0',
+    databaseEngine: 'Payload',
   })
   const schemaCount = openapiGen.output?.components?.schemas ? Object.keys(openapiGen.output.components.schemas).length : 0
   const pathCount = openapiGen.output?.paths ? Object.keys(openapiGen.output.paths).length : 0
   console.log(`  OpenAPI: ${schemaCount} schemas, ${pathCount} paths\n`)
 
   console.log('Running Payload collection generator...')
-  const payloadGen = await payload.create({
-    collection: 'generators',
-    data: {
-      title: 'auto.dev Collections',
-      version: '1.0.0',
-      databaseEngine: 'Payload',
-      outputFormat: 'payload',
-    },
+  const payloadGen = await post('generators', {
+    title: 'auto.dev Collections',
+    version: '1.0.0',
+    databaseEngine: 'Payload',
+    outputFormat: 'payload',
   })
   const fileCount = payloadGen.output?.files ? Object.keys(payloadGen.output.files).length : 0
   console.log(`  Payload: ${fileCount} collection files\n`)
 
   console.log('Running XState generator...')
-  const xstateGen = await payload.create({
-    collection: 'generators',
-    data: {
-      title: 'auto.dev State Machines',
-      version: '1.0.0',
-      databaseEngine: 'Payload',
-      outputFormat: 'xstate',
-    },
+  const xstateGen = await post('generators', {
+    title: 'auto.dev State Machines',
+    version: '1.0.0',
+    databaseEngine: 'Payload',
+    outputFormat: 'xstate',
   })
   const xstateFiles = xstateGen.output?.files ? Object.keys(xstateGen.output.files) : []
   console.log(`  XState: ${xstateFiles.length} files`)
   for (const f of xstateFiles) console.log(`    ${f}`)
   console.log()
 
-  // ── 7. Write Output Files to Disk ──────────────────────────────────────
-  const outDir = path.resolve(process.cwd(), 'generated')
+  // ── 7. Write Output Files to Disk ───────────────────────────────────────
+  const outDir = path.resolve(__dirname, '..', 'generated')
   fs.mkdirSync(outDir, { recursive: true })
 
   const openapiPath = path.join(outDir, 'openapi.json')
@@ -663,7 +644,6 @@ async function main() {
   }
 
   console.log('\nDone! All output in: ' + outDir)
-  process.exit(0)
 }
 
 main().catch((err) => {
