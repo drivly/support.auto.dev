@@ -30,13 +30,11 @@
 |---|---------|-------------|
 | 7 | Subscription is on Plan | \*:1 |
 | 8 | Subscription has Interval | \*:1 |
-| 9 | Plan has PlanName | 1:1 |
 | 10 | Plan has monthly Price | 1:1 |
 | 11 | Plan has annual Price | 1:1 |
 | 12 | Plan has RateLimit | 1:1 |
 | 102 | Customer has StripeCustomerId | 1:1 |
-| 103 | Subscription has TrialEnd | 1:1 |
-| 104 | Subscription has LastPlanChangeAt | 1:1 |
-| 105 | WebhookEvent has EventId | 1:1 |
+| 103 | Subscription has TrialEnd | \*:1 |
+| 104 | Subscription has LastPlanChangeAt | \*:1 |
 | 106 | WebhookEvent has EventType | \*:1 |
 | 107 | WebhookEvent has EventStatus | \*:1 |

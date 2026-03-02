@@ -26,12 +26,12 @@
 | # | Reading | Multiplicity |
 |---|---------|-------------|
 | 22 | Customer submits SupportRequest | 1:\* |
-| 23 | SupportRequest has Subject | 1:1 |
-| 24 | SupportRequest has Description | 1:1 |
+| 23 | SupportRequest has Subject | \*:1 |
+| 24 | SupportRequest has Description | \*:1 |
 | 25 | SupportRequest arrives via Channel | \*:1 |
 | 26 | SupportRequest has Priority | \*:1 |
 | 27 | SupportRequest concerns APIProduct | \*:\* |
 | 73 | SupportRequest has Message | 1:\* |
-| 74 | Message has Body | 1:1 |
-| 75 | Message has SentAt | 1:1 |
+| 74 | Message has Body | \*:1 |
+| 75 | Message has SentAt | \*:1 |
 | 76 | Customer sends Message | 1:\* |

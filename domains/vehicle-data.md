@@ -43,7 +43,6 @@ The vehicle taxonomy and provider mapping domain. Derived from the Vindex NORMA 
 
 | # | Reading | Multiplicity |
 |---|---------|-------------|
-| 36 | Make has MakeName | 1:1 |
 | 37 | Make manufactured Model as MakeModel | \*:\* |
 | 38 | MakeModel was manufactured for Year as YearMakeModel | \*:\* |
 | 39 | YearMakeModel has Trim as YearMakeModelTrim | 1:\* |

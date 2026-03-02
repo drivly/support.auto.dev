@@ -27,9 +27,8 @@ added to GraphDL using GraphDL's own primitives.
 
 | # | Reading | Multiplicity |
 |---|---------|-------------|
-| 85 | DomainChange has ChangeId | 1:1 |
-| 86 | DomainChange has ReadingText | 1:1 |
-| 87 | DomainChange has Rationale | 1:1 |
+| 86 | DomainChange has ReadingText | \*:1 |
+| 87 | DomainChange has Rationale | \*:1 |
 | 88 | DomainChange has DomainName | \*:1 |
 | 89 | FeatureRequest leads to DomainChange | 1:\* |
 | 90 | SupportRequest leads to DomainChange | 1:\* |

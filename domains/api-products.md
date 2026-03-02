@@ -28,18 +28,15 @@
 
 | # | Reading | Multiplicity |
 |---|---------|-------------|
-| 13 | APIProduct has EndpointSlug | 1:1 |
 | 14 | APIProduct has EndpointPath | 1:1 |
-| 15 | APIProduct has Description | 1:1 |
+| 15 | APIProduct has Description | \*:1 |
 | 16 | APIProduct belongs to ProductCategory | \*:1 |
 | 17 | Plan includes APIProduct | \*:\* |
 | 18 | Plan charges PricePerCall for APIProduct | ternary |
 | 33 | APIProduct sources data from DataProvider | \*:\* |
 | 34 | DataProvider covers CoverageRegion | \*:\* |
-| 35 | DataProvider has ProviderName | 1:1 |
-| 119 | MeterEvent has IdempotencyKey | 1:1 |
-| 120 | MeterEvent has UsageCount | 1:1 |
-| 121 | MeterEvent has ReportedAt | 1:1 |
+| 120 | MeterEvent has UsageCount | \*:1 |
+| 121 | MeterEvent has ReportedAt | \*:1 |
 | 122 | MeterEvent is for Customer | \*:1 |
 | 123 | MeterEvent is for APIProduct | \*:1 |
 | 124 | MeterEvent is for Subscription | \*:1 |

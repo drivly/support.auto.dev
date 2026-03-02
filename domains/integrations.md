@@ -26,7 +26,6 @@
 
 | # | Reading | Multiplicity |
 |---|---------|-------------|
-| 19 | Integration has IntegrationSlug | 1:1 |
 | 20 | Integration has IntegrationType | \*:1 |
 | 21 | Customer connects to Integration via ConnectedAccount | \*:\* |
 | 108 | Integration has IntegrationName | 1:1 |
@@ -34,9 +33,8 @@
 | 110 | Integration has IntegrationUrl | 1:1 |
 | 111 | ConnectedAccount has EmailAddress | 1:1 |
 | 112 | ConnectedAccount has APIKey | 1:1 |
-| 113 | ConnectSession has SessionToken | 1:1 |
 | 114 | ConnectSession has SessionStatus | \*:1 |
-| 115 | ConnectSession has RedirectUri | 1:1 |
-| 116 | ConnectSession has ConnectUrl | 1:1 |
+| 115 | ConnectSession has RedirectUri | \*:1 |
+| 116 | ConnectSession has ConnectUrl | \*:1 |
 | 117 | ConnectSession is for Customer | \*:1 |
 | 118 | ConnectSession is for Integration | \*:1 |
