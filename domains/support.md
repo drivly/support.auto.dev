@@ -27,7 +27,7 @@
 | Customer submits SupportRequest | 1:\* |
 | SupportRequest has Subject | \*:1 |
 | SupportRequest has Description | \*:1 |
-| SupportRequest arrives via Channel | \*:1 |
+| SupportRequest arrives via ChannelName | \*:1 |
 | SupportRequest has Priority | \*:1 |
 | SupportRequest concerns APIProduct | \*:\* |
 | SupportRequest has Message | 1:\* |
@@ -39,7 +39,7 @@
 
 | Fact |
 |------|
-| SupportRequest is handled via Channel 'Email' |
+| SupportRequest is handled via ChannelName 'Email' |
 
 ## Deontic Constraints
 
