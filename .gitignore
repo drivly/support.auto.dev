@@ -1,3 +1,5 @@
 .env
+.dev.vars
 generated/
 node_modules/
+dist/

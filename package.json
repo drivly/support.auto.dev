@@ -1,0 +1,15 @@
+{
+  "name": "auto.dev-graphdl",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Samuel Lippert <lippertz@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "itty-router": "^5.0.23"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260301.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.70.0"
+  }
+}
