@@ -235,6 +235,11 @@ const valueNouns: ValueNounDef[] = [
   { name: 'ReadingText', valueType: 'string' },
   { name: 'Rationale', valueType: 'string' },
   { name: 'DomainName', valueType: 'string' },
+
+  // Tenancy
+  { name: 'DomainSlug', valueType: 'string', pattern: '[a-z0-9-]+' },
+  { name: 'DomainDescription', valueType: 'string' },
+  { name: 'DomainVisibility', valueType: 'string', enum: 'private, public' },
 ]
 
 // ─── Entity Nouns (deduplicated across all 9 domains) ───────────────────────
@@ -270,6 +275,9 @@ const entityNouns: EntityNounDef[] = [
   { name: 'Color', plural: 'colors', permissions: ['create', 'read', 'update', 'list'], refScheme: ['ColorId'] },
   { name: 'Option', plural: 'options', permissions: ['create', 'read', 'update', 'list'], refScheme: ['OptionId'] },
   { name: 'DomainChange', plural: 'domain-changes', permissions: ['create', 'read', 'update', 'list'], refScheme: ['ChangeId'] },
+
+  // Tenancy
+  { name: 'Domain', plural: 'domains', permissions: ['create', 'read', 'update', 'list'], refScheme: ['Customer', 'DomainSlug'] },
 ]
 
 // ─── Facts (Readings) across all 9 domains ──────────────────────────────────
@@ -381,6 +389,12 @@ const facts: FactDef[] = [
   { text: 'FeatureRequest leads to DomainChange', multiplicity: '1:*' },
   { text: 'SupportRequest leads to DomainChange', multiplicity: '1:*' },
   { text: 'ErrorPattern leads to DomainChange', multiplicity: '1:*' },
+
+  // Tenancy
+  { text: 'Customer has Domain', multiplicity: '1:*' },
+  { text: 'Domain has DomainDescription', multiplicity: '*:1' },
+  { text: 'Domain has DomainVisibility', multiplicity: '*:1' },
+  { text: 'Domain depends on Domain', multiplicity: '*:*' },
 ]
 
 // ─── State Machines ─────────────────────────────────────────────────────────
