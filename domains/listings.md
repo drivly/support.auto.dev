@@ -44,10 +44,10 @@ Dealer vehicle inventory sourced from multiple providers into ClickHouse. The /p
 | Reading | Multiplicity |
 |---------|-------------|
 | Listing identifies Vehicle by VIN | 1:1 |
-| Listing has Price via ListingChannel | ternary |
+| Listing has Price via ListingChannel | UC(Listing,ListingChannel) |
 | Listing has Mileage | \*:1 |
 | Listing has Condition | \*:1 |
-| Listing has VDP via ListingChannel | ternary |
+| Listing has VDP via ListingChannel | UC(Listing,ListingChannel) |
 | Listing is sold by Dealer | \*:1 |
 | Dealer has DealerName | \*:1 |
 | Listing is located in City | \*:1 |
