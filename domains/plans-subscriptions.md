@@ -85,3 +85,5 @@
 | Constraint |
 |-----------|
 | Plan change must require explicit Customer confirmation |
+| Customer who has had a Subscription in Trialing state is prohibited from entering Trialing again |
+| Support may remove an accidental Subscription from Trialing if Customer did not intend to start a trial |
