@@ -21,7 +21,7 @@ The vehicle taxonomy and provider mapping domain. Derived from the Vindex NORMA 
 | MakeName | string | |
 | ModelName | string | |
 | TrimName | string | |
-| Year | integer | minimum: 1886 |
+| Year | integer | minimum: 1981 |
 | SpecsId | string | |
 | SquishVIN | string | pattern: [A-Z0-9]{10} |
 | ChromeId | string | |
@@ -39,57 +39,63 @@ The vehicle taxonomy and provider mapping domain. Derived from the Vindex NORMA 
 | Drivetrain | string | enum: AWD, FWD, RWD |
 | FuelType | string | enum: Gasoline, Diesel, Electric, Hybrid |
 
-## Readings — Taxonomy Hierarchy
+## Readings -- Taxonomy Hierarchy
 
-| # | Reading | Multiplicity |
-|---|---------|-------------|
-| 37 | Make manufactured Model as MakeModel | \*:\* |
-| 38 | MakeModel was manufactured for Year as YearMakeModel | \*:\* |
-| 39 | YearMakeModel has Trim as YearMakeModelTrim | 1:\* |
+| Reading | Multiplicity |
+|---------|-------------|
+| Make manufactured Model as MakeModel | \*:\* |
+| MakeModel was manufactured for Year as YearMakeModel | \*:\* |
+| YearMakeModel has Trim as YearMakeModelTrim | 1:\* |
 
-## Readings — Specs
+## Readings -- Specs
 
-| # | Reading | Multiplicity |
-|---|---------|-------------|
-| 40 | YearMakeModelTrim has Specs | 1:\* |
-| 41 | Specs has SquishVIN | \*:1 |
-| 42 | Specs has BodyStyle | \*:1 |
-| 43 | Specs has DoorCount | \*:1 |
-| 44 | Specs has SeatCount | \*:1 |
-| 45 | Specs has engine Option | \*:1 |
-| 46 | Specs has transmission Option | \*:1 |
-| 47 | Specs has drivetrain Option | \*:1 |
+| Reading | Multiplicity |
+|---------|-------------|
+| YearMakeModelTrim has Specs | 1:\* |
+| Specs has SquishVIN | \*:1 |
+| Specs has BodyStyle | \*:1 |
+| Specs has DoorCount | \*:1 |
+| Specs has SeatCount | \*:1 |
+| Specs has engine Option | \*:1 |
+| Specs has transmission Option | \*:1 |
+| Specs has drivetrain Option | \*:1 |
 
-## Readings — Provider ID Mapping
+## Readings -- Provider ID Mapping
 
 Provider IDs exist at multiple levels of the taxonomy. This is not a simple
-one-to-one mapping — each provider joins at different points.
+one-to-one mapping -- each provider joins at different points.
 
-Chrome ↔ Edmunds: Direct mapping via CHROME_ID in Edmunds partner data.
-KBB ↔ others: Only connects through SquishVIN — no direct ID mapping.
+Chrome to Edmunds: Direct mapping via CHROME_ID in Edmunds partner data.
+KBB to others: Only connects through SquishVIN -- no direct ID mapping.
 
-| # | Reading | Multiplicity |
-|---|---------|-------------|
-| 48 | Make has EdmundsId | 1:1 |
-| 49 | Make has KBBId | 1:1 |
-| 50 | MakeModel has EdmundsId | 1:1 |
-| 51 | MakeModel has KBBId | 1:1 |
-| 52 | YearMakeModel has EdmundsId | 1:1 |
-| 53 | YearMakeModelTrim has EdmundsId | 1:1 |
-| 54 | YearMakeModelTrim has KBBId | 1:1 |
-| 55 | Specs has ChromeId | 1:1 |
-| 56 | Specs has EdmundsId | 1:1 |
-| 57 | Specs has KBBId | 1:1 |
+| Reading | Multiplicity |
+|---------|-------------|
+| Make has EdmundsId | 1:1 |
+| Make has KBBId | 1:1 |
+| MakeModel has EdmundsId | 1:1 |
+| MakeModel has KBBId | 1:1 |
+| YearMakeModel has EdmundsId | 1:1 |
+| YearMakeModelTrim has EdmundsId | 1:1 |
+| YearMakeModelTrim has KBBId | 1:1 |
+| Specs has ChromeId | 1:1 |
+| Specs has EdmundsId | 1:1 |
+| Specs has KBBId | 1:1 |
 
-## Readings — Colors & Options
+## Readings -- Colors & Options
 
-| # | Reading | Multiplicity |
-|---|---------|-------------|
-| 58 | Color has ColorName | 1:1 |
-| 59 | Color has GenericColorName | \*:1 |
-| 60 | Color has HexCode | 1:1 |
-| 61 | Specs has Color | \*:\* |
-| 62 | Option has OptionType | \*:1 |
-| 63 | Option belongs to Specs | \*:1 |
-| 64 | Option has EdmundsId | 1:1 |
-| 65 | Option has KBBId | 1:1 |
+| Reading | Multiplicity |
+|---------|-------------|
+| Color has ColorName | 1:1 |
+| Color has GenericColorName | \*:1 |
+| Color has HexCode | 1:1 |
+| Specs has Color | \*:\* |
+| Option has OptionType | \*:1 |
+| Option belongs to Specs | \*:1 |
+| Option has EdmundsId | 1:1 |
+| Option has KBBId | 1:1 |
+
+## Instance Facts
+
+| Fact |
+|------|
+| Year minimum reflects the 1981 VIN standard adoption |

@@ -26,15 +26,27 @@
 
 ## Readings
 
-| # | Reading | Multiplicity |
-|---|---------|-------------|
-| 7 | Subscription is on Plan | \*:1 |
-| 8 | Subscription has Interval | \*:1 |
-| 10 | Plan has monthly Price | 1:1 |
-| 11 | Plan has annual Price | 1:1 |
-| 12 | Plan has RateLimit | 1:1 |
-| 102 | Customer has StripeCustomerId | 1:1 |
-| 103 | Subscription has TrialEnd | \*:1 |
-| 104 | Subscription has LastPlanChangeAt | \*:1 |
-| 106 | WebhookEvent has EventType | \*:1 |
-| 107 | WebhookEvent has EventStatus | \*:1 |
+| Reading | Multiplicity |
+|---------|-------------|
+| Subscription is on Plan | \*:1 |
+| Subscription has Interval | \*:1 |
+| Plan has monthly Price | \*:1 |
+| Plan has annual Price | \*:1 |
+| Plan has RateLimit | \*:1 |
+| Customer has StripeCustomerId | 1:1 |
+| Subscription has TrialEnd | \*:1 |
+| Subscription has LastPlanChangeAt | \*:1 |
+| WebhookEvent has EventType | \*:1 |
+| WebhookEvent has EventStatus | \*:1 |
+
+## Instance Facts
+
+| Fact |
+|------|
+| Subscription starts with TrialEnd |
+
+## Deontic Constraints
+
+| Constraint |
+|-----------|
+| Plan change must require explicit Customer confirmation |

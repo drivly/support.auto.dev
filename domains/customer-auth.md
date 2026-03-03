@@ -30,17 +30,17 @@
 
 ## Readings
 
-| # | Reading | Multiplicity |
-|---|---------|-------------|
-| 1 | Customer has Name | \*:1 |
-| 3 | Customer has UserRole | \*:1 |
-| 4 | Customer has APIKey | 1:1 |
-| 5 | Subscription belongs to Customer | \*:1 |
-| 6 | Customer authenticates via Account | 1:\* |
-| 92 | Customer has Avatar | \*:1 |
-| 93 | Customer has PasswordHash | \*:1 |
-| 94 | Customer has TwoFactorEnabled | 1:1 |
-| 96 | Account has ProviderAccountId | 1:1 |
-| 97 | Account has AccessToken | \*:1 |
-| 98 | Account has RefreshToken | \*:1 |
-| 99 | Account has ExpiresAt | \*:1 |
+| Reading | Multiplicity |
+|---------|-------------|
+| Customer has Name | \*:1 |
+| Customer has UserRole | \*:1 |
+| Customer has APIKey | 1:1 |
+| Subscription belongs to Customer | \*:1 |
+| Customer authenticates via Account | 1:\* |
+| Customer has Avatar | \*:1 |
+| Customer has PasswordHash | \*:1 |
+| Customer has TwoFactorEnabled | \*:1 |
+| Account has ProviderAccountId | 1:1 |
+| Account has AccessToken | \*:1 |
+| Account has RefreshToken | \*:1 |
+| Account has ExpiresAt | \*:1 |

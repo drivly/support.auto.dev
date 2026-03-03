@@ -15,10 +15,10 @@
 
 ## Readings
 
-| # | Reading | Multiplicity |
-|---|---------|-------------|
-| 28 | SupportRequest leads to FeatureRequest | \*:1 |
-| 29 | FeatureRequest has Subject | \*:1 |
-| 30 | FeatureRequest has Description | \*:1 |
-| 31 | FeatureRequest has VoteCount | \*:1 |
-| 32 | FeatureRequest concerns APIProduct | \*:\* |
+| Reading | Multiplicity |
+|---------|-------------|
+| SupportRequest leads to FeatureRequest | \*:1 |
+| FeatureRequest has Subject | \*:1 |
+| FeatureRequest has Description | \*:1 |
+| FeatureRequest has VoteCount | \*:1 |
+| FeatureRequest concerns APIProduct | \*:\* |
