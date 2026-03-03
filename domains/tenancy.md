@@ -20,9 +20,9 @@ are importable by any customer.
 
 ## Readings
 
-| # | Reading | Multiplicity |
-|---|---------|-------------|
-| 130 | Customer has Domain | 1:* |
-| 131 | Domain has DomainDescription | *:1 |
-| 132 | Domain has DomainVisibility | *:1 |
-| 133 | Domain depends on Domain | *:* |
+| Reading | Multiplicity |
+|---------|-------------|
+| Customer has Domain | 1:\* |
+| Domain has DomainDescription | \*:1 |
+| Domain has DomainVisibility | \*:1 |
+| Domain depends on Domain | \*:\* |

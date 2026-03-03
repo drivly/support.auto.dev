@@ -25,11 +25,11 @@ added to GraphDL using GraphDL's own primitives.
 
 ## Readings
 
-| # | Reading | Multiplicity |
-|---|---------|-------------|
-| 86 | DomainChange has ReadingText | \*:1 |
-| 87 | DomainChange has Rationale | \*:1 |
-| 88 | DomainChange has DomainName | \*:1 |
-| 89 | FeatureRequest leads to DomainChange | 1:\* |
-| 90 | SupportRequest leads to DomainChange | 1:\* |
-| 91 | ErrorPattern leads to DomainChange | 1:\* |
+| Reading | Multiplicity |
+|---------|-------------|
+| DomainChange has ReadingText | \*:1 |
+| DomainChange has Rationale | \*:1 |
+| DomainChange has DomainName | \*:1 |
+| FeatureRequest leads to DomainChange | 1:\* |
+| SupportRequest leads to DomainChange | 1:\* |
+| ErrorPattern leads to DomainChange | 1:\* |

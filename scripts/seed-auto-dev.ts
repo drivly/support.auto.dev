@@ -58,33 +58,50 @@ async function main() {
     })),
   ]
 
-  console.log(`Sending ${domainFiles.length} domain files + ${smFiles.length} state machine files...\n`)
+  console.log(`Seeding ${domainFiles.length} domain files + ${smFiles.length} state machine files...\n`)
 
-  const res = await fetch(`${BASE_URL}/seed`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ files }),
-  })
+  let totalNouns = 0, totalReadings = 0, totalStateMachines = 0, totalSkipped = 0, totalErrors = 0
+  const allErrors: string[] = []
 
-  if (!res.ok) {
-    console.error(`Seed failed: ${res.status} ${await res.text()}`)
-    process.exit(1)
+  // Send one file at a time to avoid timeouts on small machines
+  for (const file of files) {
+    const label = (file as any).domain || (file as any).entityNoun || 'unknown'
+    process.stdout.write(`  ${file.type}: ${label}...`)
+
+    const res = await fetch(`${BASE_URL}/seed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(file),
+    })
+
+    if (!res.ok) {
+      console.log(` FAILED (${res.status})`)
+      allErrors.push(`${label}: HTTP ${res.status}`)
+      totalErrors++
+      continue
+    }
+
+    const result = await res.json()
+    const r = result.files[0]
+    totalNouns += r.nouns
+    totalReadings += r.readings
+    totalStateMachines += r.stateMachines
+    totalSkipped += r.skipped
+    totalErrors += r.errors.length
+    for (const err of r.errors) allErrors.push(`${label}: ${err}`)
+
+    console.log(` ${r.nouns}n ${r.readings}r ${r.stateMachines}sm ${r.skipped}skip`)
   }
 
-  const result = await res.json()
-  console.log(`Nouns:          ${result.totalNouns}`)
-  console.log(`Readings:       ${result.totalReadings}`)
-  console.log(`State Machines: ${result.totalStateMachines}`)
-  console.log(`Skipped:        ${result.totalSkipped}`)
-  console.log(`Errors:         ${result.totalErrors}`)
+  console.log(`\nNouns:          ${totalNouns}`)
+  console.log(`Readings:       ${totalReadings}`)
+  console.log(`State Machines: ${totalStateMachines}`)
+  console.log(`Skipped:        ${totalSkipped}`)
+  console.log(`Errors:         ${totalErrors}`)
 
-  if (result.totalErrors > 0) {
+  if (allErrors.length) {
     console.log('\nErrors:')
-    for (const file of result.files) {
-      for (const err of file.errors) {
-        console.log(`  ${file.domain || 'unknown'}: ${err}`)
-      }
-    }
+    for (const err of allErrors) console.log(`  ${err}`)
   }
 
   // Run generators
