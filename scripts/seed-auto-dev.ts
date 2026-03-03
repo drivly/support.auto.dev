@@ -14,6 +14,10 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const BASE_URL = process.env.GRAPHDL_URL || 'http://localhost:3000'
+const API_KEY = process.env.GRAPHDL_API_KEY || ''
+const authHeaders: Record<string, string> = API_KEY
+  ? { 'Content-Type': 'application/json', 'Authorization': `users API-Key ${API_KEY}` }
+  : { 'Content-Type': 'application/json' }
 
 // State machine filename → entity noun name
 const SM_ENTITY_MAP: Record<string, string> = {
@@ -105,39 +109,41 @@ async function main() {
   }
 
   // Run generators
+  const outDir = path.resolve(ROOT, 'generated')
+  fs.mkdirSync(outDir, { recursive: true })
+
   console.log('\nRunning OpenAPI generator...')
   const genRes = await fetch(`${BASE_URL}/api/generators`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders,
     body: JSON.stringify({ title: 'auto.dev Full API', version: '1.0.0', databaseEngine: 'Payload' }),
   })
-  const gen = await genRes.json().then((r: any) => r.doc)
-  const schemaCount = gen.output?.components?.schemas ? Object.keys(gen.output.components.schemas).length : 0
-  console.log(`  OpenAPI: ${schemaCount} schemas`)
+  if (!genRes.ok) {
+    console.log(`  Failed: ${genRes.status}`)
+  } else {
+    const gen = await genRes.json().then((r: any) => r.doc)
+    const schemaCount = gen?.output?.components?.schemas ? Object.keys(gen.output.components.schemas).length : 0
+    console.log(`  OpenAPI: ${schemaCount} schemas`)
+    fs.writeFileSync(path.join(outDir, 'openapi.json'), JSON.stringify(gen.output, null, 2))
+  }
 
   console.log('\nRunning XState generator...')
   const xstateRes = await fetch(`${BASE_URL}/api/generators`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders,
     body: JSON.stringify({ title: 'auto.dev State Machines', version: '1.0.0', databaseEngine: 'Payload', outputFormat: 'xstate' }),
   })
-  const xstate = await xstateRes.json().then((r: any) => r.doc)
-  const xstateFiles = xstate.output?.files ? Object.keys(xstate.output.files) : []
-  console.log(`  XState: ${xstateFiles.length} files`)
-
-  // Write output to disk
-  const outDir = path.resolve(ROOT, 'generated')
-  fs.mkdirSync(outDir, { recursive: true })
-  fs.writeFileSync(path.join(outDir, 'openapi.json'), JSON.stringify(gen.output, null, 2))
-  console.log(`\nWrote generated/openapi.json`)
-
-  if (xstate.output?.files) {
-    for (const [filePath, content] of Object.entries(xstate.output.files)) {
+  if (!xstateRes.ok) {
+    console.log(`  Failed: ${xstateRes.status}`)
+  } else {
+    const xstate = await xstateRes.json().then((r: any) => r.doc)
+    const xstateFiles = xstate?.output?.files ? Object.keys(xstate.output.files) : []
+    console.log(`  XState: ${xstateFiles.length} files`)
+    for (const [filePath, content] of Object.entries(xstate?.output?.files || {})) {
       const fullPath = path.join(outDir, filePath)
       fs.mkdirSync(path.dirname(fullPath), { recursive: true })
       fs.writeFileSync(fullPath, content as string)
     }
-    console.log(`Wrote ${xstateFiles.length} state machine files to generated/`)
   }
 
   console.log('\nDone!')
