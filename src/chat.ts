@@ -61,29 +61,24 @@ export async function handleChat(request: Request, env: Env) {
     })
   }
 
+  // /ai/chat returns { content: string, toolCalls?: [...], usage, finishReason }
   const llmData: any = await llmRes.json()
 
   // Process tool calls if any
   const toolResults: Array<Record<string, unknown>> = []
-  const contentBlocks = llmData.content || []
-
-  for (const block of contentBlocks) {
-    if (block.type === 'tool_use') {
+  if (llmData.toolCalls?.length) {
+    for (const tc of llmData.toolCalls) {
       const result = await executeToolCall(
         env,
-        block.name,
+        tc.toolName || tc.name,
         subscriptionId || customerId,
-        block.input || {},
+        tc.args || tc.input || {},
       )
-      toolResults.push({ tool: block.name, result })
+      toolResults.push({ tool: tc.toolName || tc.name, result })
     }
   }
 
-  // Extract text response
-  const draft = contentBlocks
-    .filter((b: any) => b.type === 'text')
-    .map((b: any) => b.text)
-    .join('\n')
+  const draft = llmData.content || ''
 
   return new Response(JSON.stringify({
     draft,
