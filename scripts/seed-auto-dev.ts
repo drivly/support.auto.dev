@@ -1,7 +1,11 @@
 /**
  * Seed all auto.dev-graphdl domain readings into a running GraphDL ORM instance.
  *
- * Usage: GRAPHDL_URL=http://localhost:3000 npx tsx scripts/seed-auto-dev.ts
+ * Usage: npx tsx scripts/seed-auto-dev.ts
+ *
+ * Environment variables (set in .env or shell):
+ *   GRAPHDL_URL      - ORM server URL (default: http://localhost:3000)
+ *   GRAPHDL_API_KEY  - Payload CMS API key for the service account (required for generators)
  *
  * Reads domain/*.md and state-machines/*.md files directly — the markdown
  * IS the source of truth. No hand-maintained data arrays.
@@ -13,6 +17,21 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
+
+// Load .env file from project root (no external deps needed)
+const envPath = path.join(ROOT, '.env')
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq === -1) continue
+    const key = trimmed.slice(0, eq).trim()
+    const value = trimmed.slice(eq + 1).trim()
+    if (!process.env[key]) process.env[key] = value
+  }
+}
+
 const BASE_URL = process.env.GRAPHDL_URL || 'http://localhost:3000'
 const API_KEY = process.env.GRAPHDL_API_KEY || ''
 const authHeaders: Record<string, string> = API_KEY
@@ -108,7 +127,13 @@ async function main() {
     for (const err of allErrors) console.log(`  ${err}`)
   }
 
-  // Run generators
+  // Run generators (requires API key auth on Payload REST API)
+  if (!API_KEY) {
+    console.log('\nSkipping generators: GRAPHDL_API_KEY not set (add to .env or pass in shell)')
+    console.log('Done!')
+    return
+  }
+
   const outDir = path.resolve(ROOT, 'generated')
   fs.mkdirSync(outDir, { recursive: true })
 
