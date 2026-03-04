@@ -20,6 +20,8 @@
 | Interval | string | enum: monthly, annually |
 | Price | number | minimum: 0 |
 | RateLimit | integer | minimum: 0 |
+| FreeCallsPerMonth | integer | minimum: 0 |
+| MonthlyFee | number | minimum: 0 |
 | EventId | string | |
 | EventType | string | |
 | EventStatus | string | enum: processed, failed, skipped |
@@ -40,6 +42,8 @@
 | Plan has monthly Price | \*:1 |
 | Plan has annual Price | \*:1 |
 | Plan has RateLimit | \*:1 |
+| Plan has FreeCallsPerMonth | \*:1 |
+| Plan has MonthlyFee | \*:1 |
 | Customer has StripeCustomerId | 1:1 |
 | Subscription has TrialEnd | \*:1 |
 | Subscription has LastPlanChangeAt | \*:1 |
@@ -55,6 +59,15 @@
 | Fact |
 |------|
 | Subscription starts with TrialEnd |
+| Plan 'Starter' has MonthlyFee 0 |
+| Plan 'Growth' has MonthlyFee 299 |
+| Plan 'Scale' has MonthlyFee 599 |
+| Plan 'Starter' has FreeCallsPerMonth 1000 |
+| Plan 'Growth' has FreeCallsPerMonth 0 |
+| Plan 'Scale' has FreeCallsPerMonth 0 |
+| Plan 'Starter' has RateLimit 5 |
+| Plan 'Growth' has RateLimit 10 |
+| Plan 'Scale' has RateLimit 50 |
 | subscribe runs SubscribeCustomer |
 | SubscribeCustomer has FunctionType httpCallback |
 | SubscribeCustomer has CallbackUrl https://auth.vin/api/internal/billing/change-plan |

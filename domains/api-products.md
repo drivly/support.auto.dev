@@ -52,3 +52,27 @@
 | APIProduct 'vinDecode' covers CoverageRegion 'International' |
 | DataProvider 'Edmunds' covers VehicleType 'Consumer' |
 | APIProduct 'photos' requires APIProduct 'listings' |
+| Plan 'Starter' includes APIProduct 'vinDecode' as PlanProduct with PricePerCall 0.004 |
+| Plan 'Starter' includes APIProduct 'listings' as PlanProduct with PricePerCall 0.002 |
+| Plan 'Starter' includes APIProduct 'photos' as PlanProduct with PricePerCall 0.001 |
+| Plan 'Growth' includes APIProduct 'vinDecode' as PlanProduct with PricePerCall 0.0025 |
+| Plan 'Growth' includes APIProduct 'listings' as PlanProduct with PricePerCall 0.0015 |
+| Plan 'Growth' includes APIProduct 'photos' as PlanProduct with PricePerCall 0.0009 |
+| Plan 'Growth' includes APIProduct 'specs' as PlanProduct with PricePerCall 0.0015 |
+| Plan 'Growth' includes APIProduct 'recalls' as PlanProduct with PricePerCall 0.01 |
+| Plan 'Growth' includes APIProduct 'tco' as PlanProduct with PricePerCall 0.06 |
+| Plan 'Growth' includes APIProduct 'payments' as PlanProduct with PricePerCall 0.005 |
+| Plan 'Growth' includes APIProduct 'apr' as PlanProduct with PricePerCall 0.005 |
+| Plan 'Growth' includes APIProduct 'build' as PlanProduct with PricePerCall 0.10 |
+| Plan 'Scale' includes APIProduct 'vinDecode' as PlanProduct with PricePerCall 0.0015 |
+| Plan 'Scale' includes APIProduct 'listings' as PlanProduct with PricePerCall 0.001 |
+| Plan 'Scale' includes APIProduct 'photos' as PlanProduct with PricePerCall 0.0007 |
+| Plan 'Scale' includes APIProduct 'specs' as PlanProduct with PricePerCall 0.001 |
+| Plan 'Scale' includes APIProduct 'recalls' as PlanProduct with PricePerCall 0.007 |
+| Plan 'Scale' includes APIProduct 'tco' as PlanProduct with PricePerCall 0.04 |
+| Plan 'Scale' includes APIProduct 'payments' as PlanProduct with PricePerCall 0.004 |
+| Plan 'Scale' includes APIProduct 'apr' as PlanProduct with PricePerCall 0.004 |
+| Plan 'Scale' includes APIProduct 'build' as PlanProduct with PricePerCall 0.08 |
+| Plan 'Scale' includes APIProduct 'openRecalls' as PlanProduct with PricePerCall 0.06 |
+| Plan 'Scale' includes APIProduct 'plateToVin' as PlanProduct with PricePerCall 0.55 |
+| Plan 'Scale' includes APIProduct 'taxes' as PlanProduct with PricePerCall 0.005 |
