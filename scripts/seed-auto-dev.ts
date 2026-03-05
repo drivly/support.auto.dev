@@ -171,6 +171,39 @@ async function main() {
     }
   }
 
+  // Run iLayer generator per domain
+  console.log('\nRunning iLayer generators...')
+  const domainsRes = await fetch(`${BASE_URL}/api/domains?limit=100`, { headers: authHeaders })
+  if (!domainsRes.ok) {
+    console.log(`  Failed to fetch domains: ${domainsRes.status}`)
+  } else {
+    const domainsData = await domainsRes.json() as any
+    const domains = domainsData.docs || []
+    for (const domain of domains) {
+      const slug = domain.domainSlug || domain.id
+      process.stdout.write(`  iLayer (${slug})...`)
+      const ilayerRes = await fetch(`${BASE_URL}/api/generators`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          title: `${slug} ilayer`,
+          outputFormat: 'ilayer',
+          domain: domain.id,
+          domains: [domain.id],
+          databaseEngine: 'Payload',
+        }),
+      })
+      if (!ilayerRes.ok) {
+        console.log(` Failed (${ilayerRes.status})`)
+      } else {
+        const ilayer = await ilayerRes.json().then((r: any) => r.doc)
+        const layerFiles = ilayer?.output?.files ? Object.keys(ilayer.output.files) : []
+        console.log(` ${layerFiles.length} layers`)
+        fs.writeFileSync(path.join(outDir, `ilayer-${slug}.json`), JSON.stringify(ilayer.output, null, 2))
+      }
+    }
+  }
+
   console.log('\nDone!')
 }
 
