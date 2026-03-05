@@ -27,6 +27,7 @@ const DOMAINS = ['support', 'plans-subscriptions', 'customer-auth', 'listings', 
 export async function composeSystemPrompt(
   env: Env,
   customerContext: Record<string, unknown>,
+  businessRules?: string[],
 ): Promise<string> {
   const domainSections: string[] = []
 
@@ -37,6 +38,8 @@ export async function composeSystemPrompt(
     }
   }
 
+  const allConstraints = [...DEONTIC_CONSTRAINTS, ...(businessRules || [])]
+
   return `# Support Agent
 
 You are a support agent for auto.dev, a vehicle data API platform.
@@ -46,7 +49,7 @@ ${domainSections.join('\n\n')}
 
 ## Constraints
 You MUST follow these rules in every response:
-${DEONTIC_CONSTRAINTS.map(c => `- ${c}`).join('\n')}
+${allConstraints.map(c => `- ${c}`).join('\n')}
 
 ## Customer Context
 - Email: ${customerContext.email || 'unknown'}
@@ -65,6 +68,14 @@ ${DEONTIC_CONSTRAINTS.map(c => `- ${c}`).join('\n')}
 ## Your Tools
 You have access to state machine events for managing subscriptions and support requests. Use them when the customer's request requires a state change. Always confirm with the customer before making changes.
 
+You also have an \`escalate_to_human\` tool. Call it when:
+- You are uncertain about the correct answer
+- The customer needs an account-level action you cannot verify
+- The question is outside your domain knowledge
+- The situation requires human judgment
+
+If you can confidently answer the question from the domain model and constraints above, respond directly without escalating.
+
 ## IMPORTANT
-Your responses are DRAFTS for human review. A team member will review and may edit before sending. Write as if composing the email that will be sent to the customer.`
+Write as if composing the email that will be sent to the customer. If you escalate, still provide your best draft — a human reviewer will see both your draft and your escalation reason.`
 }
