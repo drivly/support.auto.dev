@@ -59,12 +59,15 @@
 | Fact |
 |------|
 | Subscription starts with TrialEnd |
+| Plan 'Free' has MonthlyFee 0 |
+| Plan 'Free' has FreeCallsPerMonth 1000 |
+| Plan 'Free' has RateLimit 5 |
 | Plan 'Starter' has MonthlyFee 0 |
 | Plan 'Growth' has MonthlyFee 299 |
 | Plan 'Scale' has MonthlyFee 599 |
 | Plan 'Starter' has FreeCallsPerMonth 1000 |
-| Plan 'Growth' has FreeCallsPerMonth 0 |
-| Plan 'Scale' has FreeCallsPerMonth 0 |
+| Plan 'Growth' has FreeCallsPerMonth 1000 |
+| Plan 'Scale' has FreeCallsPerMonth 1000 |
 | Plan 'Starter' has RateLimit 5 |
 | Plan 'Growth' has RateLimit 10 |
 | Plan 'Scale' has RateLimit 50 |
@@ -97,6 +100,6 @@
 
 | Constraint |
 |-----------|
-| Plan change must require explicit Customer confirmation |
-| Customer who has had a Subscription in Trialing state is prohibited from entering Trialing again |
-| Support may remove an accidental Subscription from Trialing if Customer did not intend to start a trial |
+| PlanChange requires explicit Customer confirmation |
+| Customer is prohibited from entering Trialing more than once |
+| Support is permitted to revert Subscription from Trialing if unintended |

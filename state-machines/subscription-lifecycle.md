@@ -8,8 +8,8 @@ Free, Trialing, Active, PastDue, Cancelled
 
 | From | To | Event | Guard |
 |------|-----|-------|-------|
-| Free | Trialing | subscribe | Plan offers trial; Customer has no prior Subscription that was Trialing |
-| Free | Active | subscribe | Plan has no trial |
+| Free | Trialing | subscribe | Customer has PaymentMethod; Plan offers trial; Customer has no prior Subscription that was Trialing |
+| Free | Active | subscribe | Customer has PaymentMethod; Plan has no trial |
 | Trialing | Active | trialEnds | Payment succeeds |
 | Trialing | Cancelled | trialEnds | No payment method |
 | Active | PastDue | paymentFails | |

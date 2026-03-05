@@ -17,7 +17,7 @@
 | Description | string | |
 | PricePerCall | number | minimum: 0 |
 | CategoryName | string | enum: Core, Marketplace, Financial, Safety |
-| ProviderName | string | enum: Edmunds, Carvana, CarMax, NHTSA, Palmoves, PCMI, KBB, AutoList, CarBuzz |
+| ProviderName | string | enum: Edmunds, Chrome, Carvana, CarMax, NHTSA, PALMoves, PCMI, KBB, AutoList, CarBuzz |
 | CoverageRegion | string | enum: US, Canada, EU, International |
 | VehicleType | string | enum: Consumer, Commercial |
 | IdempotencyKey | string | |
@@ -50,8 +50,23 @@
 | APIProduct covers CoverageRegion 'US' |
 | APIProduct covers CoverageRegion 'Canada' |
 | APIProduct 'vinDecode' covers CoverageRegion 'International' |
+| APIProduct 'specs' sources data from DataProvider 'Edmunds' |
+| APIProduct 'build' sources data from DataProvider 'Chrome' |
+| APIProduct 'recalls' sources data from DataProvider 'NHTSA' |
+| APIProduct 'openRecalls' sources data from DataProvider 'NHTSA' |
+| APIProduct 'tco' sources data from DataProvider 'Edmunds' |
+| APIProduct 'payments' sources data from DataProvider 'Edmunds' |
+| APIProduct 'apr' sources data from DataProvider 'Edmunds' |
+| APIProduct 'transport' sources data from DataProvider 'PALMoves' |
 | DataProvider 'Edmunds' covers VehicleType 'Consumer' |
+| DataProvider 'Chrome' covers VehicleType 'Consumer' |
+| DataProvider 'Chrome' covers VehicleType 'Commercial' |
+| DataProvider 'NHTSA' covers VehicleType 'Consumer' |
+| DataProvider 'NHTSA' covers VehicleType 'Commercial' |
 | APIProduct 'photos' requires APIProduct 'listings' |
+| Plan 'Free' includes APIProduct 'vinDecode' as PlanProduct with PricePerCall 0 |
+| Plan 'Free' includes APIProduct 'listings' as PlanProduct with PricePerCall 0 |
+| Plan 'Free' includes APIProduct 'photos' as PlanProduct with PricePerCall 0 |
 | Plan 'Starter' includes APIProduct 'vinDecode' as PlanProduct with PricePerCall 0.004 |
 | Plan 'Starter' includes APIProduct 'listings' as PlanProduct with PricePerCall 0.002 |
 | Plan 'Starter' includes APIProduct 'photos' as PlanProduct with PricePerCall 0.001 |
@@ -76,3 +91,19 @@
 | Plan 'Scale' includes APIProduct 'openRecalls' as PlanProduct with PricePerCall 0.06 |
 | Plan 'Scale' includes APIProduct 'plateToVin' as PlanProduct with PricePerCall 0.55 |
 | Plan 'Scale' includes APIProduct 'taxes' as PlanProduct with PricePerCall 0.005 |
+| APIProduct 'build' returns factory-installed options beyond standard equipment for the trim |
+| APIProduct 'build' returns aggregate optionsMsrp, not per-option pricing |
+| APIProduct 'specs' returns standard equipment at the trim level, not VIN-specific options |
+| APIProduct 'specs' complements APIProduct 'build' for full vehicle equipment detail |
+
+## Deontic Constraints
+
+| Constraint |
+|-----------|
+| SupportResponse must not claim availability of UnavailableFeature |
+
+## Deontic Constraint Instance Facts
+
+| Constraint | Instance |
+|-----------|----------|
+| SupportResponse must not claim availability of UnavailableFeature | invoice pricing |

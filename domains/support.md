@@ -45,5 +45,41 @@
 
 | Constraint |
 |-----------|
-| Support response must not reference internal team structure |
-| Support response must not use emdashes |
+| SupportResponse must not contain ProhibitedPunctuation |
+| SupportResponse must not contain ProhibitedFormattingPattern |
+| SupportResponse must not contain IntroductoryClause |
+| SupportResponse must not reference ProtectedConcept |
+| SupportResponse must not offer ProhibitedChannel |
+| SupportResponse is delivered via Email |
+| SupportResponse must not offer ProhibitedCommercialTerm |
+| SupportResponse pricing claim must conform to PricingModel |
+| Undocumented answer must be persisted as knowledge |
+
+## Deontic Constraint Instance Facts
+
+| Constraint | Instance |
+|-----------|----------|
+| SupportResponse must not contain ProhibitedPunctuation | — |
+| SupportResponse must not contain ProhibitedPunctuation | – |
+| SupportResponse must not contain ProhibitedFormattingPattern | paragraph title inline with prose |
+| SupportResponse must not contain ProhibitedFormattingPattern | bold header inline with prose |
+| SupportResponse must not contain IntroductoryClause | "in summary" |
+| SupportResponse must not contain IntroductoryClause | "to summarize" |
+| SupportResponse must not contain IntroductoryClause | "overall" |
+| SupportResponse must not contain IntroductoryClause | "in conclusion" |
+| SupportResponse must not contain IntroductoryClause | "to recap" |
+| SupportResponse must not reference ProtectedConcept | internal team structure |
+| SupportResponse must not reference ProtectedConcept | Free plan |
+| SupportResponse must not offer ProhibitedChannel | phone call |
+| SupportResponse must not offer ProhibitedChannel | video meeting |
+| SupportResponse must not offer ProhibitedChannel | Zoom |
+| SupportResponse must not offer ProhibitedChannel | Teams |
+| SupportResponse must not offer ProhibitedChannel | live chat |
+| SupportResponse must not offer ProhibitedChannel | callback |
+| SupportResponse must not offer ProhibitedCommercialTerm | custom pricing |
+| SupportResponse must not offer ProhibitedCommercialTerm | enterprise deal |
+| SupportResponse must not offer ProhibitedCommercialTerm | individual API access arrangement |
+| SupportResponse must not offer ProhibitedCommercialTerm | volume discount |
+| SupportResponse pricing claim must conform to PricingModel | base monthly subscription |
+| SupportResponse pricing claim must conform to PricingModel | base annual subscription |
+| SupportResponse pricing claim must conform to PricingModel | metered per-call usage |

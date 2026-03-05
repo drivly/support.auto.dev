@@ -91,11 +91,26 @@ The meta-domain. Models the business structure — services, costs, revenue — 
 | CostCenter 'Domain Registrations' has CostCategory 'Domains' |
 | CostCenter 'Team' has CostCategory 'People' |
 
+## Value Types (continued)
+
+| Value | Type | Constraints |
+|-------|------|------------|
+| RunwayMonths | integer | minimum: 1 |
+| CustomerAcquisitionCost | number | minimum: 0 |
+| CustomerLifetimeValue | number | minimum: 0 |
+
 ## Deontic Constraints
 
 | Constraint |
 |-----------|
-| The system must generate a profit |
-| Monthly revenue must exceed monthly costs |
-| Runway must exceed 6 months at current burn rate |
-| Customer acquisition cost must not exceed customer lifetime value |
+| RevenueStream total must exceed CostCenter total per Frequency |
+| Runway must exceed minimum RunwayMonths |
+| CustomerAcquisitionCost must not exceed CustomerLifetimeValue |
+
+## Deontic Constraint Instance Facts
+
+| Constraint | Instance |
+|-----------|----------|
+| RevenueStream total must exceed CostCenter total per Frequency | monthly |
+| RevenueStream total must exceed CostCenter total per Frequency | annually |
+| Runway must exceed minimum RunwayMonths | 6 |

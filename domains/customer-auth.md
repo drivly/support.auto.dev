@@ -40,6 +40,7 @@
 | Customer has Avatar | \*:1 |
 | Customer has PasswordHash | \*:1 |
 | Customer has TwoFactorEnabled | \*:1 |
+| Customer has PaymentMethod | unary |
 | Account has ProviderAccountId | 1:1 |
 | Account has AccessToken | \*:1 |
 | Account has RefreshToken | \*:1 |

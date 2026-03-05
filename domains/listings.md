@@ -83,5 +83,24 @@ Dealer vehicle inventory sourced from multiple providers into ClickHouse. The /p
 | Listing must have VDP to appear in API results |
 | Listing must have at least one Photo to appear in API results |
 | Photo must not be returned without an active Listing |
-| Support response must not name ListingSource providers |
-| Support response must not reference the ingestion pipeline architecture |
+| SupportResponse must not name ListingSource |
+| SupportResponse must not reference IngestionPipeline |
+
+## Deontic Constraint Instance Facts
+
+| Constraint | Instance |
+|-----------|----------|
+| SupportResponse must not name ListingSource | Autolist |
+| SupportResponse must not name ListingSource | AutoNation |
+| SupportResponse must not name ListingSource | AutoTrader |
+| SupportResponse must not name ListingSource | Carfax |
+| SupportResponse must not name ListingSource | CarStory |
+| SupportResponse must not name ListingSource | Carvana |
+| SupportResponse must not name ListingSource | CarMax |
+| SupportResponse must not name ListingSource | Edmunds |
+| SupportResponse must not name ListingSource | Marketcheck |
+| SupportResponse must not reference IngestionPipeline | src.do |
+| SupportResponse must not reference IngestionPipeline | load.src.do |
+| SupportResponse must not reference IngestionPipeline | ClickHouse |
+| SupportResponse must not reference IngestionPipeline | svc.do |
+| SupportResponse must not reference IngestionPipeline | BrightData |
