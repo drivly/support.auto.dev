@@ -63,6 +63,7 @@
 |-----------|----------|
 | SupportResponse must not contain ProhibitedPunctuation | — |
 | SupportResponse must not contain ProhibitedPunctuation | – |
+| SupportResponse must not contain ProhibitedPunctuation | -- |
 | SupportResponse must not contain ProhibitedFormattingPattern | paragraph title inline with prose |
 | SupportResponse must not contain ProhibitedFormattingPattern | bold header inline with prose |
 | SupportResponse must not contain IntroductoryClause | "in summary" |
