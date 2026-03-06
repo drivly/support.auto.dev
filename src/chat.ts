@@ -1,6 +1,6 @@
 import type { Env, SupportRequestData, SupportMessage } from './types'
 import { composeSystemPrompt } from './prompt'
-import { getAvailableTools, executeToolCall, formatToolsForLLM } from './tools'
+import { getAvailableTools, executeToolCall, formatToolsForLLM, getQueryGraphTool, executeGraphQuery } from './tools'
 import { addToIndex } from './requests'
 import { verify, type ClaimWarning } from './verify'
 
@@ -68,7 +68,7 @@ async function generateDraft(
     ...(subscriptionId ? await getAvailableTools(env, 'Subscription', subscriptionId) : []),
     ...(customerId ? await getAvailableTools(env, 'SupportRequest', customerId) : []),
   ]
-  const llmTools = [...formatToolsForLLM(stateTools), ESCALATE_TOOL]
+  const llmTools = [...formatToolsForLLM(stateTools), getQueryGraphTool(), ESCALATE_TOOL]
 
   const llmRes = await fetch(`${env.AUTO_DEV_API_URL}/ai/chat`, {
     method: 'POST',
@@ -108,6 +108,12 @@ async function generateDraft(
         continue
       }
 
+      if (name === 'query_graph') {
+        const result = await executeGraphQuery(env, args.query as string, customerContext?.email as string, customerContext?.role as string)
+        toolResults.push({ tool: name, result })
+        continue
+      }
+
       const result = await executeToolCall(env, name, subscriptionId || customerId || '', args)
       toolResults.push({ tool: name, result })
     }
@@ -123,7 +129,7 @@ async function generateDraft(
 
 export async function handleChat(request: Request, env: Env) {
   const body: any = await request.json()
-  const { message, customerId, subscriptionId, requestId: existingRequestId } = body
+  const { message, customerId, subscriptionId, plan, requestId: existingRequestId } = body
 
   if (!message) return json({ error: 'message required' }, 400)
 
@@ -151,6 +157,9 @@ export async function handleChat(request: Request, env: Env) {
 
   // Fetch customer context
   const customerContext: Record<string, unknown> = { email: customerId }
+  if (plan) {
+    customerContext.plan = plan
+  }
   if (subscriptionId) {
     const stateRes = await fetch(
       `${env.AUTO_DEV_API_URL}/state/Subscription/${subscriptionId}`,
@@ -159,9 +168,10 @@ export async function handleChat(request: Request, env: Env) {
     if (stateRes.ok) {
       const stateData: any = await stateRes.json()
       customerContext.subscriptionState = stateData.currentState
-      customerContext.plan = stateData.currentState
+      if (!plan) customerContext.plan = stateData.currentState
     }
   }
+  if (body.role) customerContext.role = body.role
 
   // Generate draft
   let result: DraftResult

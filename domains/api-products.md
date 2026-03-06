@@ -23,6 +23,8 @@
 | IdempotencyKey | string | |
 | UsageCount | integer | minimum: 0 |
 | ReportedAt | string | format: date-time |
+| TaxonomyLevel | string | enum: VIN, YearMakeModelTrim, YearMakeModel, MakeModel, Make |
+| EquipmentScope | string | enum: StandardEquipment, FactoryOptions |
 
 ## Readings
 
@@ -42,13 +44,19 @@
 | MeterEvent is for Customer | \*:1 |
 | MeterEvent is for APIProduct | \*:1 |
 | MeterEvent is for Subscription | \*:1 |
+| APIProduct resolves at TaxonomyLevel | \*:1 |
+| APIProduct returns EquipmentScope | \*:1 |
+| APIProduct complements APIProduct | \*:\* |
 
 ## Instance Facts
 
 | Fact |
 |------|
-| APIProduct covers CoverageRegion 'US' |
-| APIProduct covers CoverageRegion 'Canada' |
+| DataProvider 'Edmunds' covers CoverageRegion 'US' |
+| DataProvider 'Chrome' covers CoverageRegion 'US' |
+| DataProvider 'Chrome' covers CoverageRegion 'Canada' |
+| DataProvider 'NHTSA' covers CoverageRegion 'US' |
+| DataProvider 'PALMoves' covers CoverageRegion 'US' |
 | APIProduct 'vinDecode' covers CoverageRegion 'International' |
 | APIProduct 'specs' sources data from DataProvider 'Edmunds' |
 | APIProduct 'build' sources data from DataProvider 'Chrome' |
@@ -91,21 +99,8 @@
 | Plan 'Scale' includes APIProduct 'openRecalls' as PlanProduct with PricePerCall 0.06 |
 | Plan 'Scale' includes APIProduct 'plateToVin' as PlanProduct with PricePerCall 0.55 |
 | Plan 'Scale' includes APIProduct 'taxes' as PlanProduct with PricePerCall 0.005 |
-| APIProduct 'build' returns factory-installed options beyond standard equipment for the trim |
-| APIProduct 'build' returns aggregate optionsMsrp, not per-option pricing |
-| APIProduct 'specs' returns standard equipment at the trim level, not VIN-specific options |
-| APIProduct 'specs' complements APIProduct 'build' for full vehicle equipment detail |
-
-## Fact Types with Deontic Mandatory Constraints
-
-| Constraint |
-|-----------|
-| SupportResponse must not claim availability of UnavailableFeature |
-
-## Deontic Mandatory Constraint Instance Facts
-
-| Constraint | Instance |
-|-----------|----------|
-| SupportResponse must not claim availability of UnavailableFeature | per-endpoint pricing outside plan tiers |
-| SupportResponse must not claim availability of UnavailableFeature | warranty data in specs |
-| SupportResponse must not claim availability of UnavailableFeature | specs for commercial vehicles |
+| APIProduct 'build' resolves at TaxonomyLevel 'VIN' |
+| APIProduct 'specs' resolves at TaxonomyLevel 'YearMakeModelTrim' |
+| APIProduct 'build' returns EquipmentScope 'FactoryOptions' |
+| APIProduct 'specs' returns EquipmentScope 'StandardEquipment' |
+| APIProduct 'specs' complements APIProduct 'build' |

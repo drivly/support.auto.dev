@@ -38,6 +38,7 @@ Dealer vehicle inventory sourced from multiple providers into ClickHouse. The /p
 | PipelineName | string | enum: src.do, load.src.do, ClickHouse |
 | CronSchedule | string | |
 | JobStatus | string | enum: Running, Completed, Failed |
+| PipelineOperation | string | enum: cache, proxy, load, store, normalize |
 
 ## Readings
 
@@ -64,17 +65,19 @@ Dealer vehicle inventory sourced from multiple providers into ClickHouse. The /p
 | IngestionJob has CronSchedule | \*:1 |
 | IngestionJob has JobStatus | \*:1 |
 | IngestionPipeline feeds IngestionPipeline | \*:1 |
+| IngestionPipeline performs PipelineOperation | \*:\* |
 
 ## Instance Facts
 
 | Fact |
 |------|
-| Listing is sourced from dealers only |
 | IngestionPipeline 'src.do' feeds IngestionPipeline 'load.src.do' |
 | IngestionPipeline 'load.src.do' feeds IngestionPipeline 'ClickHouse' |
-| IngestionPipeline 'src.do' caches and proxies third-party APIs |
-| IngestionPipeline 'load.src.do' runs scheduled cron jobs on Fly.io |
-| IngestionPipeline 'ClickHouse' stores normalized listings for api.auto.dev |
+| IngestionPipeline 'src.do' performs PipelineOperation 'cache' |
+| IngestionPipeline 'src.do' performs PipelineOperation 'proxy' |
+| IngestionPipeline 'load.src.do' performs PipelineOperation 'load' |
+| IngestionPipeline 'ClickHouse' performs PipelineOperation 'store' |
+| IngestionPipeline 'ClickHouse' performs PipelineOperation 'normalize' |
 
 ## Fact Types with Deontic Mandatory Constraints
 
@@ -83,24 +86,3 @@ Dealer vehicle inventory sourced from multiple providers into ClickHouse. The /p
 | Listing must have VDP to appear in API results |
 | Listing must have at least one Photo to appear in API results |
 | Photo must not be returned without an active Listing |
-| SupportResponse must not name ListingSource |
-| SupportResponse must not reference IngestionPipeline |
-
-## Deontic Mandatory Constraint Instance Facts
-
-| Constraint | Instance |
-|-----------|----------|
-| SupportResponse must not name ListingSource | Autolist |
-| SupportResponse must not name ListingSource | AutoNation |
-| SupportResponse must not name ListingSource | AutoTrader |
-| SupportResponse must not name ListingSource | Carfax |
-| SupportResponse must not name ListingSource | CarStory |
-| SupportResponse must not name ListingSource | Carvana |
-| SupportResponse must not name ListingSource | CarMax |
-| SupportResponse must not name ListingSource | Edmunds |
-| SupportResponse must not name ListingSource | Marketcheck |
-| SupportResponse must not reference IngestionPipeline | src.do |
-| SupportResponse must not reference IngestionPipeline | load.src.do |
-| SupportResponse must not reference IngestionPipeline | ClickHouse |
-| SupportResponse must not reference IngestionPipeline | svc.do |
-| SupportResponse must not reference IngestionPipeline | BrightData |

@@ -58,7 +58,6 @@
 
 | Fact |
 |------|
-| Subscription starts with TrialEnd |
 | Plan 'Free' has MonthlyFee 0 |
 | Plan 'Free' has FreeCallsPerMonth 1000 |
 | Plan 'Free' has RateLimit 5 |
@@ -95,6 +94,10 @@
 | HandleTrialEnd has FunctionType httpCallback |
 | HandleTrialEnd has CallbackUrl https://auth.vin/api/internal/billing/trial-ended |
 | HandleTrialEnd has HttpMethod POST |
+| Plan 'Free' is not a visible PlanName |
+| Plan 'Starter' is the entry-level paid PlanName |
+| Plan 'Free' has no billing relationship |
+| Plan 'Starter' has metered billing |
 
 ## Fact Types with Deontic Mandatory Constraints
 

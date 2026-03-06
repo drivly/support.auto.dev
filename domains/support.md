@@ -6,6 +6,8 @@
 |--------|-----------------|-------|
 | SupportRequest | RequestId | Inbound support thread |
 | Message | MessageId | Individual message in a support thread |
+| SupportResponse | MessageId | Subtype of Message |
+| Request | RequestId | Supertype of SupportRequest and FeatureRequest |
 
 ## Value Types
 
@@ -25,11 +27,13 @@
 | Reading | Multiplicity |
 |---------|-------------|
 | Customer submits SupportRequest | 1:\* |
-| SupportRequest has Subject | \*:1 |
-| SupportRequest has Description | \*:1 |
+| Request has Subject | \*:1 |
+| Request has Description | \*:1 |
+| Request concerns APIProduct | \*:\* |
+| SupportRequest is a subtype of Request | subtype |
+| FeatureRequest is a subtype of Request | subtype |
 | SupportRequest arrives via ChannelName | \*:1 |
 | SupportRequest has Priority | \*:1 |
-| SupportRequest concerns APIProduct | \*:\* |
 | SupportRequest has Message | 1:\* |
 | Message has Body | \*:1 |
 | Message has SentAt | \*:1 |
@@ -56,6 +60,9 @@
 
 | SupportResponse must not offer to perform APIRequest on behalf of Customer |
 | SupportResponse is permitted to offer APIRequest assistance when Customer cannot retrieve data |
+| SupportResponse must not name ListingSource |
+| SupportResponse must not reference IngestionPipeline |
+| SupportResponse must not claim availability of UnavailableFeature |
 
 ## Deontic Mandatory Constraint Instance Facts
 
@@ -86,3 +93,20 @@
 | SupportResponse pricing claim must conform to PricingModel | base monthly subscription |
 | SupportResponse pricing claim must conform to PricingModel | base annual subscription |
 | SupportResponse pricing claim must conform to PricingModel | metered per-call usage |
+| SupportResponse must not name ListingSource | Autolist |
+| SupportResponse must not name ListingSource | AutoNation |
+| SupportResponse must not name ListingSource | AutoTrader |
+| SupportResponse must not name ListingSource | Carfax |
+| SupportResponse must not name ListingSource | CarStory |
+| SupportResponse must not name ListingSource | Carvana |
+| SupportResponse must not name ListingSource | CarMax |
+| SupportResponse must not name ListingSource | Edmunds |
+| SupportResponse must not name ListingSource | Marketcheck |
+| SupportResponse must not reference IngestionPipeline | src.do |
+| SupportResponse must not reference IngestionPipeline | load.src.do |
+| SupportResponse must not reference IngestionPipeline | ClickHouse |
+| SupportResponse must not reference IngestionPipeline | svc.do |
+| SupportResponse must not reference IngestionPipeline | BrightData |
+| SupportResponse must not claim availability of UnavailableFeature | per-endpoint pricing outside plan tiers |
+| SupportResponse must not claim availability of UnavailableFeature | warranty data in specs |
+| SupportResponse must not claim availability of UnavailableFeature | specs for commercial vehicles |
