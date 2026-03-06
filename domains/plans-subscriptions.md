@@ -96,7 +96,7 @@
 | HandleTrialEnd has CallbackUrl https://auth.vin/api/internal/billing/trial-ended |
 | HandleTrialEnd has HttpMethod POST |
 
-## Deontic Constraints
+## Fact Types with Deontic Mandatory Constraints
 
 | Constraint |
 |-----------|

@@ -96,14 +96,16 @@
 | APIProduct 'specs' returns standard equipment at the trim level, not VIN-specific options |
 | APIProduct 'specs' complements APIProduct 'build' for full vehicle equipment detail |
 
-## Deontic Constraints
+## Fact Types with Deontic Mandatory Constraints
 
 | Constraint |
 |-----------|
 | SupportResponse must not claim availability of UnavailableFeature |
 
-## Deontic Constraint Instance Facts
+## Deontic Mandatory Constraint Instance Facts
 
 | Constraint | Instance |
 |-----------|----------|
-| SupportResponse must not claim availability of UnavailableFeature | invoice pricing |
+| SupportResponse must not claim availability of UnavailableFeature | per-endpoint pricing outside plan tiers |
+| SupportResponse must not claim availability of UnavailableFeature | warranty data in specs |
+| SupportResponse must not claim availability of UnavailableFeature | specs for commercial vehicles |

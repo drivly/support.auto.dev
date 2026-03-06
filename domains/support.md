@@ -41,7 +41,7 @@
 |------|
 | SupportRequest is handled via ChannelName 'Email' |
 
-## Deontic Constraints
+## Fact Types with Deontic Mandatory Constraints
 
 | Constraint |
 |-----------|
@@ -53,9 +53,11 @@
 | SupportResponse is delivered via Email |
 | SupportResponse must not offer ProhibitedCommercialTerm |
 | SupportResponse pricing claim must conform to PricingModel |
-| Undocumented answer must be persisted as knowledge |
 
-## Deontic Constraint Instance Facts
+| SupportResponse must not offer to perform APIRequest on behalf of Customer |
+| SupportResponse is permitted to offer APIRequest assistance when Customer cannot retrieve data |
+
+## Deontic Mandatory Constraint Instance Facts
 
 | Constraint | Instance |
 |-----------|----------|

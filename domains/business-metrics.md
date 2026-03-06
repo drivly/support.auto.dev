@@ -99,7 +99,7 @@ The meta-domain. Models the business structure — services, costs, revenue — 
 | CustomerAcquisitionCost | number | minimum: 0 |
 | CustomerLifetimeValue | number | minimum: 0 |
 
-## Deontic Constraints
+## Fact Types with Deontic Mandatory Constraints
 
 | Constraint |
 |-----------|
@@ -107,7 +107,7 @@ The meta-domain. Models the business structure — services, costs, revenue — 
 | Runway must exceed minimum RunwayMonths |
 | CustomerAcquisitionCost must not exceed CustomerLifetimeValue |
 
-## Deontic Constraint Instance Facts
+## Deontic Mandatory Constraint Instance Facts
 
 | Constraint | Instance |
 |-----------|----------|

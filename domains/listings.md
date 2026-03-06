@@ -76,7 +76,7 @@ Dealer vehicle inventory sourced from multiple providers into ClickHouse. The /p
 | IngestionPipeline 'load.src.do' runs scheduled cron jobs on Fly.io |
 | IngestionPipeline 'ClickHouse' stores normalized listings for api.auto.dev |
 
-## Deontic Constraints
+## Fact Types with Deontic Mandatory Constraints
 
 | Constraint |
 |-----------|
@@ -86,7 +86,7 @@ Dealer vehicle inventory sourced from multiple providers into ClickHouse. The /p
 | SupportResponse must not name ListingSource |
 | SupportResponse must not reference IngestionPipeline |
 
-## Deontic Constraint Instance Facts
+## Deontic Mandatory Constraint Instance Facts
 
 | Constraint | Instance |
 |-----------|----------|
