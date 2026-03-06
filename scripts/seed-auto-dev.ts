@@ -1,11 +1,11 @@
 /**
- * Seed all auto.dev-graphdl domain readings into a running GraphDL ORM instance.
+ * Seed all auto.dev-graphdl domain readings via the api.auto.dev GraphDL proxy.
  *
  * Usage: npx tsx scripts/seed-auto-dev.ts
  *
  * Environment variables (set in .env or shell):
- *   GRAPHDL_URL      - ORM server URL (default: http://localhost:3000)
- *   GRAPHDL_API_KEY  - Payload CMS API key for the service account (required for generators)
+ *   AUTO_DEV_API_KEY  - api.auto.dev API key (required)
+ *   AUTO_DEV_API_URL  - API base URL (default: https://api.auto.dev)
  *
  * Reads domain/*.md and state-machines/*.md files directly — the markdown
  * IS the source of truth. No hand-maintained data arrays.
@@ -32,11 +32,18 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-const BASE_URL = process.env.GRAPHDL_URL || 'http://localhost:3000'
-const API_KEY = process.env.GRAPHDL_API_KEY || ''
-const authHeaders: Record<string, string> = API_KEY
-  ? { 'Content-Type': 'application/json', 'Authorization': `users API-Key ${API_KEY}` }
-  : { 'Content-Type': 'application/json' }
+const BASE_URL = process.env.AUTO_DEV_API_URL || 'https://api.auto.dev'
+const API_KEY = process.env.AUTO_DEV_API_KEY || ''
+
+if (!API_KEY) {
+  console.error('AUTO_DEV_API_KEY is required. Set it in .env or pass in shell.')
+  process.exit(1)
+}
+
+const authHeaders: Record<string, string> = {
+  'Content-Type': 'application/json',
+  'X-API-Key': API_KEY,
+}
 
 // State machine filename → entity noun name
 const SM_ENTITY_MAP: Record<string, string> = {
@@ -54,9 +61,10 @@ async function main() {
 
   // Verify server is reachable
   try {
-    await fetch(`${BASE_URL}/api/nouns?limit=1`)
-  } catch {
-    console.error(`Cannot reach ${BASE_URL}. Is graphdl-orm running?`)
+    const check = await fetch(`${BASE_URL}/graphdl/raw/nouns?limit=1`, { headers: { 'X-API-Key': API_KEY } })
+    if (!check.ok) throw new Error(`HTTP ${check.status}`)
+  } catch (err) {
+    console.error(`Cannot reach ${BASE_URL}/graphdl/raw/. Check AUTO_DEV_API_KEY.`, err)
     process.exit(1)
   }
 
@@ -91,9 +99,9 @@ async function main() {
     const label = (file as any).domain || (file as any).entityNoun || 'unknown'
     process.stdout.write(`  ${file.type}: ${label}...`)
 
-    const res = await fetch(`${BASE_URL}/seed`, {
+    const res = await fetch(`${BASE_URL}/graphdl/seed`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify(file),
     })
 
@@ -127,18 +135,11 @@ async function main() {
     for (const err of allErrors) console.log(`  ${err}`)
   }
 
-  // Run generators (requires API key auth on Payload REST API)
-  if (!API_KEY) {
-    console.log('\nSkipping generators: GRAPHDL_API_KEY not set (add to .env or pass in shell)')
-    console.log('Done!')
-    return
-  }
-
   const outDir = path.resolve(ROOT, 'generated')
   fs.mkdirSync(outDir, { recursive: true })
 
   console.log('\nRunning OpenAPI generator...')
-  const genRes = await fetch(`${BASE_URL}/api/generators`, {
+  const genRes = await fetch(`${BASE_URL}/graphdl/raw/generators`, {
     method: 'POST',
     headers: authHeaders,
     body: JSON.stringify({ title: 'auto.dev Full API', version: '1.0.0', databaseEngine: 'Payload' }),
@@ -153,7 +154,7 @@ async function main() {
   }
 
   console.log('\nRunning XState generator...')
-  const xstateRes = await fetch(`${BASE_URL}/api/generators`, {
+  const xstateRes = await fetch(`${BASE_URL}/graphdl/raw/generators`, {
     method: 'POST',
     headers: authHeaders,
     body: JSON.stringify({ title: 'auto.dev State Machines', version: '1.0.0', databaseEngine: 'Payload', outputFormat: 'xstate' }),
@@ -173,7 +174,7 @@ async function main() {
 
   // Run iLayer generator per domain
   console.log('\nRunning iLayer generators...')
-  const domainsRes = await fetch(`${BASE_URL}/api/domains?limit=100`, { headers: authHeaders })
+  const domainsRes = await fetch(`${BASE_URL}/graphdl/raw/domains?limit=100`, { headers: authHeaders })
   if (!domainsRes.ok) {
     console.log(`  Failed to fetch domains: ${domainsRes.status}`)
   } else {
@@ -182,7 +183,7 @@ async function main() {
     for (const domain of domains) {
       const slug = domain.domainSlug || domain.id
       process.stdout.write(`  iLayer (${slug})...`)
-      const ilayerRes = await fetch(`${BASE_URL}/api/generators`, {
+      const ilayerRes = await fetch(`${BASE_URL}/graphdl/raw/generators`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
