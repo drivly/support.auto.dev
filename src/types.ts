@@ -1,3 +1,5 @@
+import type { ClaimWarning } from './verify'
+
 export interface Env {
   AUTO_DEV_API_URL: string
   AUTO_DEV_API_KEY: string
@@ -10,6 +12,7 @@ export interface SupportMessage {
   content: string
   timestamp: string
   toolCalls?: Array<{ tool: string; result: unknown }>
+  warnings?: ClaimWarning[]
 }
 
 export interface SupportRequestData {

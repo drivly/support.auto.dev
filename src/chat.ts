@@ -2,6 +2,7 @@ import type { Env, SupportRequestData, SupportMessage } from './types'
 import { composeSystemPrompt } from './prompt'
 import { getAvailableTools, executeToolCall, formatToolsForLLM } from './tools'
 import { addToIndex } from './requests'
+import { verify, type ClaimWarning } from './verify'
 
 const ESCALATE_TOOL = {
   name: 'escalate_to_human',
@@ -172,6 +173,14 @@ export async function handleChat(request: Request, env: Env) {
 
   const status = result.escalated ? 'escalated' : 'sent'
 
+  // Verify draft against domain constraints
+  let warnings: ClaimWarning[] = []
+  try {
+    warnings = await verify(env, result.draft, 'support')
+  } catch {
+    // fail open
+  }
+
   // Append agent message
   requestData.messages.push({
     role: 'agent',
@@ -180,6 +189,7 @@ export async function handleChat(request: Request, env: Env) {
       : result.draft,
     timestamp: new Date().toISOString(),
     ...(result.toolResults.length ? { toolCalls: result.toolResults } : {}),
+    ...(warnings.length ? { warnings } : {}),
   })
   requestData.status = status
   requestData.updatedAt = new Date().toISOString()
@@ -193,7 +203,7 @@ export async function handleChat(request: Request, env: Env) {
     }
   }
 
-  return json({ requestId, draft: result.draft, toolCalls: result.toolResults.length ? result.toolResults : undefined, customerContext, status })
+  return json({ requestId, draft: result.draft, toolCalls: result.toolResults.length ? result.toolResults : undefined, customerContext, status, warnings: warnings.length ? warnings : undefined })
 }
 
 // Assign from Slack — decodes contact form data, stores in KV, auto-drafts, redirects to admin UI
@@ -243,10 +253,18 @@ export async function handleContactAssign(request: Request, env: Env) {
   const customerContext: Record<string, unknown> = { email }
   let draft: string | null = null
   let draftEscalated = false
+  let warnings: ClaimWarning[] = []
   try {
     const result = await generateDraft(env, requestData.messages, customerContext, undefined, email)
     draftEscalated = result.escalated
     draft = result.draft
+
+    // Verify draft against domain constraints
+    try {
+      warnings = await verify(env, result.draft, 'support')
+    } catch {
+      // fail open
+    }
 
     requestData.messages.push({
       role: 'agent',
@@ -255,6 +273,7 @@ export async function handleContactAssign(request: Request, env: Env) {
         : result.draft,
       timestamp: new Date().toISOString(),
       ...(result.toolResults.length ? { toolCalls: result.toolResults } : {}),
+      ...(warnings.length ? { warnings } : {}),
     })
     requestData.status = draftEscalated ? 'escalated' : 'sent'
   } catch {
@@ -301,6 +320,17 @@ export async function handleContactAssign(request: Request, env: Env) {
         ],
       },
     ]
+    if (warnings.length) {
+      slackBlocks.splice(1, 0, {
+        type: 'context',
+        elements: [{
+          type: 'mrkdwn',
+          text: `:warning: ${warnings.length} constraint violation${warnings.length > 1 ? 's' : ''} found\n${warnings.map((w) =>
+            `• ${w.reading}${w.instance ? ` '${w.instance}'` : ''}${w.claim ? `: ${w.claim}` : ''}`
+          ).join('\n')}`,
+        }],
+      })
+    }
     // Fire and forget — don't block the redirect
     fetch(env.SLACK_WEBHOOK_URL, {
       method: 'POST',
@@ -358,6 +388,14 @@ export async function handleRedraft(request: IRequest, env: Env) {
 
   const status = result.escalated ? 'escalated' : 'sent'
 
+  // Verify re-drafted response against domain constraints
+  let warnings: ClaimWarning[] = []
+  try {
+    warnings = await verify(env, result.draft, 'support')
+  } catch {
+    // fail open
+  }
+
   requestData.messages.push({
     role: 'agent',
     content: result.escalationReason
@@ -365,11 +403,12 @@ export async function handleRedraft(request: IRequest, env: Env) {
       : result.draft,
     timestamp: new Date().toISOString(),
     ...(result.toolResults.length ? { toolCalls: result.toolResults } : {}),
+    ...(warnings.length ? { warnings } : {}),
   })
   requestData.status = status
   requestData.updatedAt = new Date().toISOString()
 
   await env.SUPPORT_KV.put(`support:${id}`, JSON.stringify(requestData))
 
-  return json({ draft: result.draft, previousDraft, ruleAdded: reason, totalRules: allRules.length, status })
+  return json({ draft: result.draft, previousDraft, ruleAdded: reason, totalRules: allRules.length, status, warnings: warnings.length ? warnings : undefined })
 }
