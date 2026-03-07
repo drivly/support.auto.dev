@@ -26,16 +26,6 @@ function json(data: unknown, status = 200) {
   })
 }
 
-function getVerifiedIdentity(request: Request): { email?: string; name?: string; role?: string; plan?: string } | null {
-  const email = request.headers.get('X-Verified-Email')
-  if (!email) return null
-  return {
-    email,
-    name: request.headers.get('X-Verified-Name') || undefined,
-    role: request.headers.get('X-Verified-Role') || undefined,
-    plan: request.headers.get('X-Verified-Plan') || undefined,
-  }
-}
 
 async function getBusinessRules(kv: KVNamespace): Promise<string[]> {
   const raw = await kv.get('business-rules')
@@ -140,16 +130,9 @@ async function generateDraft(
 
 export async function handleChat(request: Request, env: Env) {
   const body: any = await request.json()
-  const { message, subscriptionId, plan, requestId: existingRequestId } = body
+  const { message, customerId, subscriptionId, plan, requestId: existingRequestId, role: callerRole } = body
 
   if (!message) return json({ error: 'message required' }, 400)
-
-  // Use verified identity from api.auto.dev proxy headers, fall back to body
-  const verified = getVerifiedIdentity(request)
-  const customerId = verified?.email || body.customerId
-  const callerRole = verified?.role || body.role
-
-  if (!customerId) return json({ error: 'Authentication required' }, 401)
 
   const requestId = existingRequestId || crypto.randomUUID()
   const isNewRequest = !existingRequestId
@@ -162,7 +145,7 @@ export async function handleChat(request: Request, env: Env) {
     requestData = raw ? JSON.parse(raw) : null
   }
   requestData ??= {
-    customerId,
+    customerId: customerId || 'anonymous',
     subject: message.slice(0, 120),
     status: 'sent',
     createdAt: now,
