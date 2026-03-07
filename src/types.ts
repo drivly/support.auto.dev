@@ -19,7 +19,8 @@ export interface SupportMessage {
 export interface SupportRequestData {
   customerId: string
   subject: string
-  status: 'sent' | 'escalated' | 'resolved' | 'closed'
+  status: 'sent' | 'escalated' | 'resolved' | 'closed' | 'merged'
+  mergedInto?: string
   createdAt: string
   updatedAt: string
   messages: SupportMessage[]

@@ -89,4 +89,46 @@ export async function resolveRequest(request: IRequest, env: Env) {
   return json({ ok: true })
 }
 
+export async function mergeRequests(request: IRequest, env: Env) {
+  const { id: primaryId } = request.params
+  const body: any = await request.json()
+  const sourceIds: string[] = body.sourceIds
+
+  if (!sourceIds?.length) return json({ error: 'sourceIds required' }, 400)
+
+  // Load primary request
+  const primaryRaw = await env.SUPPORT_KV.get(`support:${primaryId}`)
+  if (!primaryRaw) return json({ error: 'Primary request not found' }, 404)
+  const primary: SupportRequestData = JSON.parse(primaryRaw)
+
+  // Load and merge each source
+  const mergedIds: string[] = []
+  for (const sourceId of sourceIds) {
+    if (sourceId === primaryId) continue
+    const sourceRaw = await env.SUPPORT_KV.get(`support:${sourceId}`)
+    if (!sourceRaw) continue
+
+    const source: SupportRequestData = JSON.parse(sourceRaw)
+
+    // Copy messages into primary, tagged with source
+    for (const msg of source.messages) {
+      primary.messages.push(msg)
+    }
+
+    // Mark source as merged
+    source.status = 'merged'
+    source.mergedInto = primaryId
+    source.updatedAt = new Date().toISOString()
+    await env.SUPPORT_KV.put(`support:${sourceId}`, JSON.stringify(source))
+    mergedIds.push(sourceId)
+  }
+
+  // Sort all messages by timestamp
+  primary.messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  primary.updatedAt = new Date().toISOString()
+  await env.SUPPORT_KV.put(`support:${primaryId}`, JSON.stringify(primary))
+
+  return json({ ok: true, primaryId, mergedIds })
+}
+
 export { addToIndex }
