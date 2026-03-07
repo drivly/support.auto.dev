@@ -22,7 +22,7 @@ export async function composeSystemPrompt(
   for (const domain of DOMAINS) {
     const readings = await fetchReadings(env, domain)
     if (readings.length) {
-      domainSections.push(`### ${domain}\n${readings.map(r => `- ${r}`).join('\n')}`)
+      domainSections.push(`### ${domain}\n${readings.map((r) => `- ${r}`).join('\n')}`)
     }
   }
 
@@ -35,17 +35,19 @@ You are a support agent for auto.dev, a vehicle data API platform.
 ## Domain Model
 ${domainSections.join('\n\n')}
 
-${allConstraints.length ? `## Additional Business Rules
+${
+  allConstraints.length
+    ? `## Additional Business Rules
 These rules were learned from past corrections:
-${allConstraints.map(c => `- ${c}`).join('\n')}
-` : ''}
+${allConstraints.map((c) => `- ${c}`).join('\n')}
+`
+    : ''
+}
 
-## Customer Context — THIS IS THE CUSTOMER YOU ARE TALKING TO
+## Customer Context
 The customer's email is: ${customerContext.email || 'unknown'}
 Their plan: ${customerContext.plan || 'not yet determined'}
 Their subscription state: ${customerContext.subscriptionState || 'not yet determined'}
-
-CRITICAL: The email above is authoritative. It comes from the authenticated session. Do NOT use any other email address for this customer, even if query results mention other customers. If the customer asks "what is my email", the answer is ALWAYS: ${customerContext.email || 'unknown'}.
 
 ## Communication Style
 - Use paragraph prose, not bullet lists
