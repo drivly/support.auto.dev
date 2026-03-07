@@ -26,6 +26,23 @@ function json(data: unknown, status = 200) {
   })
 }
 
+async function verifySession(request: Request, env: Env): Promise<{ email?: string; name?: string; role?: string } | null> {
+  const auth = request.headers.get('Authorization')
+  if (!auth?.startsWith('Bearer ')) return null
+  const token = auth.slice(7)
+
+  try {
+    const res = await fetch(`${env.AUTO_DEV_API_URL}/api/auth/session`, {
+      headers: { Cookie: `__Secure-authjs.session-token=${token}` },
+    })
+    if (!res.ok) return null
+    const data: any = await res.json()
+    return data?.user || null
+  } catch {
+    return null
+  }
+}
+
 async function getBusinessRules(kv: KVNamespace): Promise<string[]> {
   const raw = await kv.get('business-rules')
   return raw ? JSON.parse(raw) : []
@@ -129,9 +146,16 @@ async function generateDraft(
 
 export async function handleChat(request: Request, env: Env) {
   const body: any = await request.json()
-  const { message, customerId, subscriptionId, plan, requestId: existingRequestId } = body
+  const { message, subscriptionId, plan, requestId: existingRequestId } = body
 
   if (!message) return json({ error: 'message required' }, 400)
+
+  // Verify caller identity from session token — don't trust body
+  const session = await verifySession(request, env)
+  const customerId = session?.email || body.customerId
+  const callerRole = session?.role || body.role
+
+  if (!customerId) return json({ error: 'Authentication required' }, 401)
 
   const requestId = existingRequestId || crypto.randomUUID()
   const isNewRequest = !existingRequestId
@@ -144,7 +168,7 @@ export async function handleChat(request: Request, env: Env) {
     requestData = raw ? JSON.parse(raw) : null
   }
   requestData ??= {
-    customerId: customerId || 'anonymous',
+    customerId,
     subject: message.slice(0, 120),
     status: 'sent',
     createdAt: now,
@@ -155,7 +179,7 @@ export async function handleChat(request: Request, env: Env) {
   // Append user message
   requestData.messages.push({ role: 'user', content: message, timestamp: now })
 
-  // Fetch customer context
+  // Fetch customer context — use verified identity
   const customerContext: Record<string, unknown> = { email: customerId }
   if (plan) {
     customerContext.plan = plan
@@ -171,7 +195,7 @@ export async function handleChat(request: Request, env: Env) {
       if (!plan) customerContext.plan = stateData.currentState
     }
   }
-  if (body.role) customerContext.role = body.role
+  if (callerRole) customerContext.role = callerRole
 
   // Generate draft
   let result: DraftResult
