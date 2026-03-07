@@ -199,22 +199,29 @@ export async function handleChat(request: Request, env: Env) {
   }
   if (callerRole) customerContext.role = callerRole
 
-  // Generate draft
-  let result: DraftResult
-  try {
-    result = await generateDraft(env, requestData.messages, customerContext, subscriptionId, customerId)
-  } catch (err) {
-    return json({ error: 'LLM call failed', detail: String(err) }, 502)
-  }
-
-  const status = result.escalated ? 'escalated' : 'sent'
-
-  // Verify draft against domain constraints
+  // Generate draft, verify against constraints, and auto-redraft on violations
+  let result!: DraftResult
   let warnings: ClaimWarning[] = []
-  try {
-    warnings = await verify(env, result.draft, 'support')
-  } catch {
-    // fail open
+  const MAX_VERIFY_ROUNDS = 2
+
+  for (let verifyRound = 0; verifyRound <= MAX_VERIFY_ROUNDS; verifyRound++) {
+    const constraintRules = warnings.map(w =>
+      `CONSTRAINT VIOLATION — you MUST fix this: "${w.reading}"${w.instance ? ` (you wrote: '${w.instance}')` : ''}${w.claim ? ` — ${w.claim}` : ''}`
+    )
+
+    try {
+      result = await generateDraft(env, requestData.messages, customerContext, subscriptionId, customerId, constraintRules.length ? constraintRules : undefined)
+    } catch (err) {
+      return json({ error: 'LLM call failed', detail: String(err) }, 502)
+    }
+
+    try {
+      warnings = await verify(env, result.draft, 'support')
+    } catch {
+      warnings = []
+    }
+
+    if (!warnings.length) break
   }
 
   // Append agent message
@@ -227,6 +234,7 @@ export async function handleChat(request: Request, env: Env) {
     ...(result.toolResults.length ? { toolCalls: result.toolResults } : {}),
     ...(warnings.length ? { warnings } : {}),
   })
+  const status = result.escalated ? 'escalated' as const : 'sent' as const
   requestData.status = status
   requestData.updatedAt = new Date().toISOString()
 
@@ -285,30 +293,37 @@ export async function handleContactAssign(request: Request, env: Env) {
     messages: [{ role: 'user', content: userContent, timestamp: now }],
   }
 
-  // Auto-draft a response
+  // Auto-draft a response with constraint verification loop
   const customerContext: Record<string, unknown> = { email }
   let draft: string | null = null
   let draftEscalated = false
   let warnings: ClaimWarning[] = []
   try {
-    const result = await generateDraft(env, requestData.messages, customerContext, undefined, email)
-    draftEscalated = result.escalated
-    draft = result.draft
+    let result: DraftResult | undefined
+    for (let verifyRound = 0; verifyRound <= 2; verifyRound++) {
+      const constraintRules = warnings.map(w =>
+        `CONSTRAINT VIOLATION — you MUST fix this: "${w.reading}"${w.instance ? ` (you wrote: '${w.instance}')` : ''}${w.claim ? ` — ${w.claim}` : ''}`
+      )
+      result = await generateDraft(env, requestData.messages, customerContext, undefined, email, constraintRules.length ? constraintRules : undefined)
 
-    // Verify draft against domain constraints
-    try {
-      warnings = await verify(env, result.draft, 'support')
-    } catch {
-      // fail open
+      try {
+        warnings = await verify(env, result.draft, 'support')
+      } catch {
+        warnings = []
+      }
+      if (!warnings.length) break
     }
+
+    draftEscalated = result!.escalated
+    draft = result!.draft
 
     requestData.messages.push({
       role: 'agent',
-      content: result.escalationReason
-        ? `${result.draft}\n\n[Escalation reason: ${result.escalationReason}]`
-        : result.draft,
+      content: result!.escalationReason
+        ? `${result!.draft}\n\n[Escalation reason: ${result!.escalationReason}]`
+        : result!.draft,
       timestamp: new Date().toISOString(),
-      ...(result.toolResults.length ? { toolCalls: result.toolResults } : {}),
+      ...(result!.toolResults.length ? { toolCalls: result!.toolResults } : {}),
       ...(warnings.length ? { warnings } : {}),
     })
     requestData.status = draftEscalated ? 'escalated' : 'sent'
@@ -395,10 +410,11 @@ export async function handleRedraft(request: IRequest, env: Env) {
 
   const body: any = await request.json()
   const { reason } = body
-  if (!reason) return json({ error: 'reason required' }, 400)
 
-  // Store as permanent business rule
-  const allRules = await addBusinessRule(env.SUPPORT_KV, reason)
+  // Store as permanent business rule only if a reason is provided
+  const allRules = reason
+    ? await addBusinessRule(env.SUPPORT_KV, reason)
+    : await getBusinessRules(env.SUPPORT_KV)
 
   const requestData: SupportRequestData = JSON.parse(raw)
 
@@ -413,24 +429,33 @@ export async function handleRedraft(request: IRequest, env: Env) {
     requestData.messages.splice(lastAgentIdx, 1)
   }
 
-  // Re-generate with all business rules (including the new one)
+  // Re-generate with all business rules (including the new one), verify against constraints
   const customerContext: Record<string, unknown> = { email: requestData.customerId }
-  let result: DraftResult
-  try {
-    result = await generateDraft(env, requestData.messages, customerContext, undefined, requestData.customerId, allRules)
-  } catch (err) {
-    return json({ error: 'Re-draft failed', detail: String(err) }, 502)
+  let result!: DraftResult
+  let warnings: ClaimWarning[] = []
+
+  for (let verifyRound = 0; verifyRound <= 2; verifyRound++) {
+    const constraintRules = [
+      ...allRules,
+      ...warnings.map(w =>
+        `CONSTRAINT VIOLATION — you MUST fix this: "${w.reading}"${w.instance ? ` (you wrote: '${w.instance}')` : ''}${w.claim ? ` — ${w.claim}` : ''}`
+      ),
+    ]
+    try {
+      result = await generateDraft(env, requestData.messages, customerContext, undefined, requestData.customerId, constraintRules)
+    } catch (err) {
+      return json({ error: 'Re-draft failed', detail: String(err) }, 502)
+    }
+
+    try {
+      warnings = await verify(env, result.draft, 'support')
+    } catch {
+      warnings = []
+    }
+    if (!warnings.length) break
   }
 
   const status = result.escalated ? 'escalated' : 'sent'
-
-  // Verify re-drafted response against domain constraints
-  let warnings: ClaimWarning[] = []
-  try {
-    warnings = await verify(env, result.draft, 'support')
-  } catch {
-    // fail open
-  }
 
   requestData.messages.push({
     role: 'agent',
@@ -446,5 +471,5 @@ export async function handleRedraft(request: IRequest, env: Env) {
 
   await env.SUPPORT_KV.put(`support:${id}`, JSON.stringify(requestData))
 
-  return json({ draft: result.draft, previousDraft, ruleAdded: reason, totalRules: allRules.length, status, warnings: warnings.length ? warnings : undefined })
+  return json({ draft: result.draft, previousDraft, ruleAdded: reason || null, totalRules: allRules.length, status, warnings: warnings.length ? warnings : undefined })
 }
