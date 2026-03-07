@@ -89,50 +89,36 @@ async function main() {
     })),
   ]
 
-  console.log(`Seeding ${domainFiles.length} domain files + ${smFiles.length} state machine files...\n`)
+  console.log(`Seeding ${domainFiles.length} domain files + ${smFiles.length} state machine files in one batch...\n`)
 
-  let totalNouns = 0, totalReadings = 0, totalStateMachines = 0, totalSkipped = 0, totalErrors = 0
-  const allErrors: string[] = []
+  const res = await fetch(`${BASE_URL}/graphdl/seed`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ files }),
+  })
 
-  // Send one file at a time to avoid timeouts on small machines
-  for (const file of files) {
-    const label = (file as any).domain || (file as any).entityNoun || 'unknown'
-    process.stdout.write(`  ${file.type}: ${label}...`)
-
-    const res = await fetch(`${BASE_URL}/graphdl/seed`, {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify(file),
-    })
-
-    if (!res.ok) {
-      console.log(` FAILED (${res.status})`)
-      allErrors.push(`${label}: HTTP ${res.status}`)
-      totalErrors++
-      continue
-    }
-
-    const result = await res.json()
-    const r = result.files[0]
-    totalNouns += r.nouns
-    totalReadings += r.readings
-    totalStateMachines += r.stateMachines
-    totalSkipped += r.skipped
-    totalErrors += r.errors.length
-    for (const err of r.errors) allErrors.push(`${label}: ${err}`)
-
-    console.log(` ${r.nouns}n ${r.readings}r ${r.stateMachines}sm ${r.skipped}skip`)
+  if (!res.ok) {
+    console.error(`Seed failed: HTTP ${res.status}`)
+    process.exit(1)
   }
 
-  console.log(`\nNouns:          ${totalNouns}`)
-  console.log(`Readings:       ${totalReadings}`)
-  console.log(`State Machines: ${totalStateMachines}`)
-  console.log(`Skipped:        ${totalSkipped}`)
-  console.log(`Errors:         ${totalErrors}`)
+  const result = await res.json()
+  for (const r of result.files) {
+    const label = r.domain || 'state-machine'
+    console.log(`  ${label}: ${r.nouns}n ${r.readings}r ${r.stateMachines}sm ${r.skipped}skip${r.errors.length ? ` ${r.errors.length}err` : ''}`)
+  }
 
-  if (allErrors.length) {
+  console.log(`\nNouns:          ${result.totalNouns}`)
+  console.log(`Readings:       ${result.totalReadings}`)
+  console.log(`State Machines: ${result.totalStateMachines}`)
+  console.log(`Skipped:        ${result.totalSkipped}`)
+  console.log(`Errors:         ${result.totalErrors}`)
+
+  if (result.totalErrors) {
     console.log('\nErrors:')
-    for (const err of allErrors) console.log(`  ${err}`)
+    for (const r of result.files) {
+      for (const err of r.errors) console.log(`  ${r.domain || 'state-machine'}: ${err}`)
+    }
   }
 
   const outDir = path.resolve(ROOT, 'generated')

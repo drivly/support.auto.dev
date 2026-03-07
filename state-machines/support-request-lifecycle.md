@@ -2,7 +2,7 @@
 
 ## States
 
-Received, Triaging, Investigating, WaitingOnCustomer, Resolved, Closed
+Received, Triaging, Investigating, WaitingOnCustomer, Resolved
 
 ## Transitions
 
@@ -13,5 +13,4 @@ Received, Triaging, Investigating, WaitingOnCustomer, Resolved, Closed
 | Investigating | WaitingOnCustomer | requestInfo |
 | WaitingOnCustomer | Investigating | customerResponds |
 | Investigating | Resolved | resolve |
-| Resolved | Closed | confirm |
 | Resolved | Investigating | reopen |

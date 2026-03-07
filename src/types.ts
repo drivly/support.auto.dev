@@ -5,7 +5,6 @@ export interface Env {
   AUTO_DEV_API_KEY: string
   AUTH_VIN_API_KEY?: string
   SLACK_WEBHOOK_URL: string
-  SUPPORT_KV: KVNamespace
 }
 
 export interface SupportMessage {
@@ -14,12 +13,13 @@ export interface SupportMessage {
   timestamp: string
   toolCalls?: Array<{ tool: string; result: unknown }>
   warnings?: ClaimWarning[]
+  escalationReason?: string
 }
 
 export interface SupportRequestData {
   customerId: string
   subject: string
-  status: 'sent' | 'escalated' | 'resolved' | 'closed' | 'merged'
+  status: string // State machine state name (Triaging, Investigating, Resolved, etc.) or 'merged'
   mergedInto?: string
   createdAt: string
   updatedAt: string

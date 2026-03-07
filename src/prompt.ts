@@ -1,5 +1,7 @@
 import type { Env } from './types'
 
+const CONSTRAINT_PATTERN = /\b(must not|must|is obligated|is prohibited|is permitted|requires|does not require|must be referred to)\b/i
+
 async function fetchReadings(env: Env, domain: string): Promise<string[]> {
   const res = await fetch(
     `${env.AUTO_DEV_API_URL}/graphdl/raw/readings?where[domain][equals]=${encodeURIComponent(domain)}&depth=0&pagination=false`,
@@ -15,34 +17,40 @@ const DOMAINS = ['support', 'plans-subscriptions', 'customer-auth', 'listings', 
 export async function composeSystemPrompt(
   env: Env,
   customerContext: Record<string, unknown>,
-  businessRules?: string[],
+  extraConstraints?: string[],
 ): Promise<string> {
-  const domainSections: string[] = []
+  const factSections: string[] = []
+  const allConstraints: string[] = []
 
   for (const domain of DOMAINS) {
     const readings = await fetchReadings(env, domain)
-    if (readings.length) {
-      domainSections.push(`### ${domain}\n${readings.map((r) => `- ${r}`).join('\n')}`)
+    const facts: string[] = []
+    for (const r of readings) {
+      if (CONSTRAINT_PATTERN.test(r)) {
+        allConstraints.push(r)
+      } else {
+        facts.push(r)
+      }
+    }
+    if (facts.length) {
+      factSections.push(`### ${domain}\n${facts.map((r) => `- ${r}`).join('\n')}`)
     }
   }
 
-  const allConstraints = [...(businessRules || [])]
+  if (extraConstraints?.length) {
+    allConstraints.push(...extraConstraints)
+  }
 
   return `# Support Agent
 
 You are a support agent for auto.dev, a vehicle data API platform.
 
 ## Domain Model
-${domainSections.join('\n\n')}
+${factSections.join('\n\n')}
 
-${
-  allConstraints.length
-    ? `## Additional Business Rules
-These rules were learned from past corrections:
+## Constraints
+These are mandatory rules. Your response MUST comply with every constraint. Violations will be automatically detected and your draft will be rejected.
 ${allConstraints.map((c) => `- ${c}`).join('\n')}
-`
-    : ''
-}
 
 ## Customer Context
 ${
@@ -58,15 +66,6 @@ NEVER use query_graph to look up customer-specific data.
 You can only answer general questions about auto.dev plans, pricing, API features, and documentation.
 If they need account-specific help, tell them to sign in at auto.dev first.`
 }
-
-## Communication Style
-- Use paragraph prose, not bullet lists
-- Be concise and helpful
-- Email only, never offer calls
-- VIN decoding is global, all other products are North America only
-- Specs are Edmunds-backed, consumer vehicles only
-- Photos only available for active dealer listings
-- Year minimum: 1981 (VIN standard adoption)
 
 ## Your Tools
 You have a \`query_graph\` tool to look up any fact in the knowledge graph. Use it when you need to verify a customer's plan, check API product details, or confirm any domain fact. Write fact patterns using the vocabulary from the domain model above.
@@ -87,5 +86,5 @@ You also have an \`escalate_to_human\` tool. Call it when:
 If you can confidently answer the question from the domain model, your graph queries, and constraints above, respond directly without escalating.
 
 ## IMPORTANT
-Write as if composing the email that will be sent to the customer. If you escalate, still provide your best draft — a human reviewer will see both your draft and your escalation reason.`
+Write as if composing the message that will be sent to the customer. If you escalate, still provide your best draft — a human reviewer will see both your draft and your escalation reason.`
 }

@@ -1,8 +1,48 @@
-import type { Env, SupportRequestData, SupportMessage } from './types'
+import type { Env, SupportMessage } from './types'
 import { composeSystemPrompt } from './prompt'
 import { getAvailableTools, executeToolCall, formatToolsForLLM, getQueryGraphTool, executeGraphQuery } from './tools'
-import { addToIndex } from './requests'
+import { syncStateAfterDraft } from './requests'
 import { verify, type ClaimWarning } from './verify'
+import { createRequest, addMessage, findRequest, getMessages } from './facts'
+import type { FactMessage } from './facts'
+
+async function reasonToReading(env: Env, reason: string): Promise<string> {
+  const res = await fetch(`${env.AUTO_DEV_API_URL}/ai/chat`, {
+    method: 'POST',
+    headers: { 'X-API-Key': env.AUTO_DEV_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 256,
+      system: `You convert admin feedback into a single ORM constraint reading. The reading must use deontic language (must, must not, is obligated to, is prohibited from, is permitted to). Output ONLY the reading text, nothing else.\n\nExamples:\n- "don't quote prices without checking" → "Agent must not quote specific prices without first querying the knowledge graph"\n- "always mention the plan name" → "Agent is obligated to mention the customer Plan name in every response"\n- "stop saying we have a free tier" → "Agent must not claim that a free tier exists"`,
+      messages: [{ role: 'user', content: reason }],
+    }),
+  })
+  if (!res.ok) return `Agent must ${reason}`
+  const data: any = await res.json()
+  return data.content || `Agent must ${reason}`
+}
+
+async function addReadingToSupport(env: Env, readingText: string): Promise<void> {
+  const headers = { 'Content-Type': 'application/json', 'X-API-Key': env.AUTO_DEV_API_KEY }
+  const base = `${env.AUTO_DEV_API_URL}/graphdl/raw`
+  const SUPPORT_DOMAIN_ID = '69ab7cf4a5ce5e411ed3c3da'
+
+  // Create graph-schema for this reading
+  const name = readingText.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')
+  const schemaRes = await fetch(`${base}/graph-schemas`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ name, domain: SUPPORT_DOMAIN_ID }),
+  })
+  if (!schemaRes.ok) return
+  const schema = await schemaRes.json().then((r: any) => r.doc)
+
+  // Create reading linked to graph-schema and domain
+  await fetch(`${base}/readings`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ text: readingText, graphSchema: schema.id, domain: SUPPORT_DOMAIN_ID }),
+  })
+}
 
 const ESCALATE_TOOL = {
   name: 'escalate_to_human',
@@ -27,20 +67,6 @@ function json(data: unknown, status = 200) {
 }
 
 
-async function getBusinessRules(kv: KVNamespace): Promise<string[]> {
-  const raw = await kv.get('business-rules')
-  return raw ? JSON.parse(raw) : []
-}
-
-async function addBusinessRule(kv: KVNamespace, rule: string) {
-  const rules = await getBusinessRules(kv)
-  if (!rules.includes(rule)) {
-    rules.push(rule)
-    await kv.put('business-rules', JSON.stringify(rules))
-  }
-  return rules
-}
-
 interface DraftResult {
   draft: string
   toolResults: Array<{ tool: string; result: unknown }>
@@ -56,10 +82,7 @@ async function generateDraft(
   customerId?: string,
   extraRules?: string[],
 ): Promise<DraftResult> {
-  const businessRules = await getBusinessRules(env.SUPPORT_KV)
-  const allRules = [...businessRules, ...(extraRules || [])]
-
-  const systemPrompt = await composeSystemPrompt(env, customerContext, allRules)
+  const systemPrompt = await composeSystemPrompt(env, customerContext, extraRules)
 
   const llmMessages: Array<{ role: string; content: any }> = messages
     .filter(m => m.role === 'user' || m.role === 'agent')
@@ -163,29 +186,29 @@ export async function handleChat(request: Request, env: Env) {
   const isNewRequest = !existingRequestId
   const now = new Date().toISOString()
 
-  // Load or initialize the support request
-  let requestData: SupportRequestData
+  // Find or create the request resource
+  let resourceId: string
+  let messages: FactMessage[]
+
   if (!isNewRequest) {
-    const raw = await env.SUPPORT_KV.get(`support:${requestId}`)
-    requestData = raw ? JSON.parse(raw) : null
-  }
-  requestData ??= {
-    customerId: customerId || 'anonymous',
-    subject: message.slice(0, 120),
-    status: 'sent',
-    createdAt: now,
-    updatedAt: now,
-    messages: [],
+    const found = await findRequest(env, requestId)
+    if (!found) return json({ error: 'Request not found' }, 404)
+    resourceId = found.resourceId
+    messages = await getMessages(env, resourceId)
+  } else {
+    resourceId = await createRequest(env, requestId, customerId || 'anonymous', message.slice(0, 120))
+    messages = []
   }
 
-  // Append user message
-  requestData.messages.push({ role: 'user', content: message, timestamp: now })
+  // Store user message as a fact
+  const userMsg: FactMessage = { role: 'user', content: message, timestamp: now }
+  await addMessage(env, resourceId, userMsg)
+  messages.push(userMsg)
 
-  // Fetch customer context — use verified identity
+  // Fetch customer context — authenticated users default to Starter
   const customerContext: Record<string, unknown> = { email: customerId }
-  if (plan) {
-    customerContext.plan = plan
-  }
+  if (plan) customerContext.plan = plan
+  else if (customerId && customerId !== 'anonymous') customerContext.plan = 'Starter'
   if (subscriptionId) {
     const stateRes = await fetch(
       `${env.AUTO_DEV_API_URL}/state/Subscription/${subscriptionId}`,
@@ -199,58 +222,44 @@ export async function handleChat(request: Request, env: Env) {
   }
   if (callerRole) customerContext.role = callerRole
 
-  // Generate draft, verify against constraints, and auto-redraft on violations
+  // Generate draft with constraint verification
   let result!: DraftResult
   let warnings: ClaimWarning[] = []
-  const MAX_VERIFY_ROUNDS = 2
 
-  for (let verifyRound = 0; verifyRound <= MAX_VERIFY_ROUNDS; verifyRound++) {
+  for (let verifyRound = 0; verifyRound <= 2; verifyRound++) {
     const constraintRules = warnings.map(w =>
       `CONSTRAINT VIOLATION — you MUST fix this: "${w.reading}"${w.instance ? ` (you wrote: '${w.instance}')` : ''}${w.claim ? ` — ${w.claim}` : ''}`
     )
-
     try {
-      result = await generateDraft(env, requestData.messages, customerContext, subscriptionId, customerId, constraintRules.length ? constraintRules : undefined)
+      result = await generateDraft(env, messages as SupportMessage[], customerContext, subscriptionId, customerId, constraintRules.length ? constraintRules : undefined)
     } catch (err) {
       return json({ error: 'LLM call failed', detail: String(err) }, 502)
     }
-
-    try {
-      warnings = await verify(env, result.draft, 'support')
-    } catch {
-      warnings = []
-    }
-
+    try { warnings = await verify(env, result.draft, 'support') } catch { warnings = [] }
     if (!warnings.length) break
   }
 
-  // Append agent message
-  requestData.messages.push({
+  // Store agent message as a fact
+  const agentMsg: FactMessage = {
     role: 'agent',
-    content: result.escalationReason
-      ? `${result.draft}\n\n[Escalation reason: ${result.escalationReason}]`
-      : result.draft,
+    content: result.draft,
     timestamp: new Date().toISOString(),
     ...(result.toolResults.length ? { toolCalls: result.toolResults } : {}),
     ...(warnings.length ? { warnings } : {}),
-  })
-  const status = result.escalated ? 'escalated' as const : 'sent' as const
-  requestData.status = status
-  requestData.updatedAt = new Date().toISOString()
+    ...(result.escalationReason ? { escalationReason: result.escalationReason } : {}),
+  }
+  await addMessage(env, resourceId, agentMsg)
 
-  // Persist
-  await env.SUPPORT_KV.put(`support:${requestId}`, JSON.stringify(requestData))
+  // Advance state machine for new requests
+  let status = 'Investigating'
   if (isNewRequest) {
-    await addToIndex(env.SUPPORT_KV, 'support-all', requestId)
-    if (customerId) {
-      await addToIndex(env.SUPPORT_KV, `support-by-customer:${customerId}`, requestId)
-    }
+    status = await syncStateAfterDraft(env, requestId, result.escalated)
   }
 
   return json({ requestId, draft: result.draft, toolCalls: result.toolResults.length ? result.toolResults : undefined, customerContext, status, warnings: warnings.length ? warnings : undefined })
 }
 
-// Assign from Slack — decodes contact form data, stores in KV, auto-drafts, redirects to admin UI
+// Assign from Slack — decodes contact form data, stores as facts, auto-drafts, redirects to admin UI
 export async function handleContactAssign(request: Request, env: Env) {
   const url = new URL(request.url)
   const encoded = url.searchParams.get('data')
@@ -284,58 +293,45 @@ export async function handleContactAssign(request: Request, env: Env) {
     apiReference && `API: ${apiReference}`,
   ].filter(Boolean).join('\n')
 
-  const requestData: SupportRequestData = {
-    customerId: email,
-    subject,
-    status: 'sent',
-    createdAt: now,
-    updatedAt: now,
-    messages: [{ role: 'user', content: userContent, timestamp: now }],
-  }
+  // Create request and user message as facts
+  const resourceId = await createRequest(env, requestId, email, subject)
+  const userMsg: FactMessage = { role: 'user', content: userContent, timestamp: now }
+  await addMessage(env, resourceId, userMsg)
 
   // Auto-draft a response with constraint verification loop
-  const customerContext: Record<string, unknown> = { email }
+  const customerContext: Record<string, unknown> = { email, plan: 'Starter' }
   let draft: string | null = null
   let draftEscalated = false
   let warnings: ClaimWarning[] = []
+  const messages: FactMessage[] = [userMsg]
   try {
     let result: DraftResult | undefined
     for (let verifyRound = 0; verifyRound <= 2; verifyRound++) {
       const constraintRules = warnings.map(w =>
         `CONSTRAINT VIOLATION — you MUST fix this: "${w.reading}"${w.instance ? ` (you wrote: '${w.instance}')` : ''}${w.claim ? ` — ${w.claim}` : ''}`
       )
-      result = await generateDraft(env, requestData.messages, customerContext, undefined, email, constraintRules.length ? constraintRules : undefined)
-
-      try {
-        warnings = await verify(env, result.draft, 'support')
-      } catch {
-        warnings = []
-      }
+      result = await generateDraft(env, messages as SupportMessage[], customerContext, undefined, email, constraintRules.length ? constraintRules : undefined)
+      try { warnings = await verify(env, result.draft, 'support') } catch { warnings = [] }
       if (!warnings.length) break
     }
 
     draftEscalated = result!.escalated
     draft = result!.draft
 
-    requestData.messages.push({
+    await addMessage(env, resourceId, {
       role: 'agent',
-      content: result!.escalationReason
-        ? `${result!.draft}\n\n[Escalation reason: ${result!.escalationReason}]`
-        : result!.draft,
+      content: result!.draft,
       timestamp: new Date().toISOString(),
       ...(result!.toolResults.length ? { toolCalls: result!.toolResults } : {}),
       ...(warnings.length ? { warnings } : {}),
+      ...(result!.escalationReason ? { escalationReason: result!.escalationReason } : {}),
     })
-    requestData.status = draftEscalated ? 'escalated' : 'sent'
   } catch {
-    // Store without draft — admin can reply manually
-    requestData.status = 'escalated'
+    draftEscalated = true
   }
 
-  requestData.updatedAt = new Date().toISOString()
-  await env.SUPPORT_KV.put(`support:${requestId}`, JSON.stringify(requestData))
-  await addToIndex(env.SUPPORT_KV, 'support-all', requestId)
-  await addToIndex(env.SUPPORT_KV, `support-by-customer:${email}`, requestId)
+  // Advance state machine
+  await syncStateAfterDraft(env, requestId, draftEscalated)
 
   // Post the draft back to Slack
   if (env.SLACK_WEBHOOK_URL && draft) {
@@ -405,71 +401,52 @@ interface IRequest extends Request {
 export async function handleRedraft(request: IRequest, env: Env) {
   const { id } = request.params
 
-  const raw = await env.SUPPORT_KV.get(`support:${id}`)
-  if (!raw) return json({ error: 'Not found' }, 404)
+  const found = await findRequest(env, id)
+  if (!found) return json({ error: 'Not found' }, 404)
 
   const body: any = await request.json()
   const { reason } = body
 
-  // Store as permanent business rule only if a reason is provided
-  const allRules = reason
-    ? await addBusinessRule(env.SUPPORT_KV, reason)
-    : await getBusinessRules(env.SUPPORT_KV)
-
-  const requestData: SupportRequestData = JSON.parse(raw)
-
-  // Remove the last agent message (the draft being replaced)
-  let lastAgentIdx = -1
-  for (let i = requestData.messages.length - 1; i >= 0; i--) {
-    if (requestData.messages[i].role === 'agent') { lastAgentIdx = i; break }
-  }
-  let previousDraft: string | undefined
-  if (lastAgentIdx >= 0) {
-    previousDraft = requestData.messages[lastAgentIdx].content
-    requestData.messages.splice(lastAgentIdx, 1)
+  // Convert reason to a constraint reading and persist in the domain model
+  let readingText: string | undefined
+  if (reason) {
+    readingText = await reasonToReading(env, reason)
+    await addReadingToSupport(env, readingText)
   }
 
-  // Re-generate with all business rules (including the new one), verify against constraints
-  const customerContext: Record<string, unknown> = { email: requestData.customerId }
+  // Get messages, strip all previous agent drafts before sending to LLM
+  const allMessages = await getMessages(env, found.resourceId)
+  const messages = allMessages.filter(m => m.role !== 'agent')
+
+  // Re-generate — readings are now in the domain model, fetched by composeSystemPrompt
+  const customerId = found.value.customerId
+  const customerContext: Record<string, unknown> = { email: customerId }
+  if (customerId && customerId !== 'anonymous') customerContext.plan = 'Starter'
   let result!: DraftResult
   let warnings: ClaimWarning[] = []
 
   for (let verifyRound = 0; verifyRound <= 2; verifyRound++) {
-    const constraintRules = [
-      ...allRules,
-      ...warnings.map(w =>
-        `CONSTRAINT VIOLATION — you MUST fix this: "${w.reading}"${w.instance ? ` (you wrote: '${w.instance}')` : ''}${w.claim ? ` — ${w.claim}` : ''}`
-      ),
-    ]
+    const constraintRules = warnings.map(w =>
+      `CONSTRAINT VIOLATION — you MUST fix this: "${w.reading}"${w.instance ? ` (you wrote: '${w.instance}')` : ''}${w.claim ? ` — ${w.claim}` : ''}`
+    )
     try {
-      result = await generateDraft(env, requestData.messages, customerContext, undefined, requestData.customerId, constraintRules)
+      result = await generateDraft(env, messages as SupportMessage[], customerContext, undefined, found.value.customerId, constraintRules.length ? constraintRules : undefined)
     } catch (err) {
       return json({ error: 'Re-draft failed', detail: String(err) }, 502)
     }
-
-    try {
-      warnings = await verify(env, result.draft, 'support')
-    } catch {
-      warnings = []
-    }
+    try { warnings = await verify(env, result.draft, 'support') } catch { warnings = [] }
     if (!warnings.length) break
   }
 
-  const status = result.escalated ? 'escalated' : 'sent'
-
-  requestData.messages.push({
+  // Store new draft as a fact
+  await addMessage(env, found.resourceId, {
     role: 'agent',
-    content: result.escalationReason
-      ? `${result.draft}\n\n[Escalation reason: ${result.escalationReason}]`
-      : result.draft,
+    content: result.draft,
     timestamp: new Date().toISOString(),
     ...(result.toolResults.length ? { toolCalls: result.toolResults } : {}),
     ...(warnings.length ? { warnings } : {}),
+    ...(result.escalationReason ? { escalationReason: result.escalationReason } : {}),
   })
-  requestData.status = status
-  requestData.updatedAt = new Date().toISOString()
 
-  await env.SUPPORT_KV.put(`support:${id}`, JSON.stringify(requestData))
-
-  return json({ draft: result.draft, previousDraft, ruleAdded: reason || null, totalRules: allRules.length, status, warnings: warnings.length ? warnings : undefined })
+  return json({ draft: result.draft, readingAdded: readingText || null, status: found.value.status, warnings: warnings.length ? warnings : undefined })
 }

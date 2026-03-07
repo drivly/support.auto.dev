@@ -10,11 +10,5 @@
 	// Secrets (set via `wrangler secret put`): AUTO_DEV_API_KEY, SLACK_WEBHOOK_URL
 	"vars": {
 		"AUTO_DEV_API_URL": "https://api.auto.dev"
-	},
-	"kv_namespaces": [
-		{
-			"binding": "SUPPORT_KV",
-			"id": "9ba3f71e4f9f422eb1c52c0c9534d5c1"
-		}
-	]
+	}
 }
