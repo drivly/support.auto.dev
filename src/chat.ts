@@ -61,9 +61,9 @@ async function generateDraft(
 
   const systemPrompt = await composeSystemPrompt(env, customerContext, allRules)
 
-  const llmMessages = messages
+  const llmMessages: Array<{ role: string; content: any }> = messages
     .filter(m => m.role === 'user' || m.role === 'agent')
-    .map(m => ({ role: m.role === 'agent' ? 'assistant' : 'user', content: m.content }))
+    .map(m => ({ role: m.role === 'agent' ? 'assistant' : 'user', content: m.content as any }))
 
   const stateTools = [
     ...(subscriptionId ? await getAvailableTools(env, 'Subscription', subscriptionId) : []),
@@ -71,57 +71,82 @@ async function generateDraft(
   ]
   const llmTools = [...formatToolsForLLM(stateTools), getQueryGraphTool(), ESCALATE_TOOL]
 
-  const llmRes = await fetch(`${env.AUTO_DEV_API_URL}/ai/chat`, {
-    method: 'POST',
-    headers: {
-      'X-API-Key': env.AUTO_DEV_API_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
-      system: systemPrompt,
-      messages: llmMessages,
-      tools: llmTools,
-    }),
-  })
-
-  if (!llmRes.ok) {
-    const err = await llmRes.text()
-    throw new Error(`LLM call failed: ${err}`)
-  }
-
-  const llmData: any = await llmRes.json()
-
   const toolResults: Array<{ tool: string; result: unknown }> = []
   let escalated = false
   let escalationReason: string | undefined
+  let currentMessages = [...llmMessages]
+  let finalContent = ''
 
-  if (llmData.toolCalls?.length) {
+  // Tool use loop — keep calling LLM until it produces a text response
+  for (let round = 0; round < 5; round++) {
+    const llmRes = await fetch(`${env.AUTO_DEV_API_URL}/ai/chat`, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': env.AUTO_DEV_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages: currentMessages,
+        tools: llmTools,
+      }),
+    })
+
+    if (!llmRes.ok) {
+      const err = await llmRes.text()
+      throw new Error(`LLM call failed: ${err}`)
+    }
+
+    const llmData: any = await llmRes.json()
+
+    if (llmData.content) finalContent = llmData.content
+
+    if (!llmData.toolCalls?.length) break
+
+    // Build assistant message with tool use blocks and collect results
+    const toolUseBlocks: any[] = []
+    const toolResultBlocks: any[] = []
+
     for (const tc of llmData.toolCalls) {
       const name = tc.toolName || tc.name
       const args = tc.args || tc.input || {}
+      const toolUseId = tc.toolCallId || tc.id || `tool_${round}_${toolUseBlocks.length}`
+
+      toolUseBlocks.push({ type: 'tool_use', id: toolUseId, name, input: args })
 
       if (name === 'escalate_to_human') {
         escalated = true
         escalationReason = args.reason || 'Agent requested human review'
+        toolResultBlocks.push({ type: 'tool_result', tool_use_id: toolUseId, content: 'Escalated to human reviewer.' })
         continue
       }
 
+      let result: unknown
       if (name === 'query_graph') {
-        const result = await executeGraphQuery(env, args.query as string, customerContext?.email as string, customerContext?.role as string)
-        toolResults.push({ tool: name, result })
-        continue
+        result = await executeGraphQuery(env, args.query as string, customerContext?.email as string, customerContext?.role as string)
+      } else {
+        result = await executeToolCall(env, name, subscriptionId || customerId || '', args)
       }
-
-      const result = await executeToolCall(env, name, subscriptionId || customerId || '', args)
       toolResults.push({ tool: name, result })
+      toolResultBlocks.push({ type: 'tool_result', tool_use_id: toolUseId, content: JSON.stringify(result) })
     }
+
+    // Append assistant tool use + user tool results to conversation
+    currentMessages.push({
+      role: 'assistant',
+      content: [
+        ...(llmData.content ? [{ type: 'text', text: llmData.content }] : []),
+        ...toolUseBlocks,
+      ],
+    })
+    currentMessages.push({ role: 'user', content: toolResultBlocks })
   }
 
   return {
-    draft: llmData.content || '',
+    draft: finalContent,
     toolResults,
     escalated,
     escalationReason,
