@@ -27,6 +27,7 @@
 | RefreshToken | string | |
 | ExpiresAt | string | format: date-time |
 | ProviderAccountId | string | |
+| EmailDomain | string | |
 
 ## Readings
 
@@ -44,4 +45,13 @@
 | Account has ProviderAccountId | 1:1 |
 | Account has AccessToken | \*:1 |
 | Account has RefreshToken | \*:1 |
+| Admin is a subtype of Customer | subtype |
+| Customer has EmailDomain | \*:1 |
 | Account has ExpiresAt | \*:1 |
+
+## Instance Facts
+
+| Fact |
+|------|
+| Customer with EmailDomain 'driv.ly' has UserRole 'ADMIN' |
+| Customer with EmailDomain 'repo.do' has UserRole 'ADMIN' |

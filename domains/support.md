@@ -8,6 +8,7 @@
 | Message | MessageId | Individual message in a support thread |
 | SupportResponse | MessageId | Subtype of Message |
 | Request | RequestId | Supertype of SupportRequest and FeatureRequest |
+| Admin | EmailAddress | Subtype of Customer |
 
 ## Value Types
 
@@ -22,6 +23,7 @@
 | ChannelName | string | enum: Email |
 | Priority | string | enum: low, medium, high, urgent |
 | ImplementationDetail | string | |
+| Reason | string | |
 
 ## Readings
 
@@ -39,6 +41,12 @@
 | Message has Body | \*:1 |
 | Message has SentAt | \*:1 |
 | Customer sends Message | 1:\* |
+| SupportResponse is a subtype of Message | subtype |
+| Admin redrafts SupportResponse with Reason | \*:\* |
+| Admin resolves SupportRequest | \*:\* |
+| Admin reopens SupportRequest | \*:\* |
+| Admin merges SupportRequest into SupportRequest | \*:\* |
+| Admin adds Constraint to SupportResponse | \*:\* |
 
 ## Instance Facts
 

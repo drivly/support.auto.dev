@@ -19,3 +19,5 @@
 |---------|-------------|
 | SupportRequest leads to FeatureRequest | \*:1 |
 | FeatureRequest has VoteCount | \*:1 |
+| Customer votes on FeatureRequest | \*:\* |
+| FeatureRequest has Priority | \*:1 |

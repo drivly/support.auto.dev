@@ -2,7 +2,7 @@
 
 ## States
 
-Proposed, Investigating, Approved, InProgress, Shipped, Closed
+Proposed, Investigating, Approved, InProgress, Shipped
 
 ## Transitions
 
@@ -10,7 +10,6 @@ Proposed, Investigating, Approved, InProgress, Shipped, Closed
 |------|-----|-------|
 | Proposed | Investigating | investigate |
 | Investigating | Approved | approve |
-| Investigating | Closed | reject |
+| Investigating | Proposed | defer |
 | Approved | InProgress | startWork |
 | InProgress | Shipped | deploy |
-| Shipped | Closed | confirm |
