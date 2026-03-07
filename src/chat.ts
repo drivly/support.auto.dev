@@ -26,20 +26,14 @@ function json(data: unknown, status = 200) {
   })
 }
 
-async function verifySession(request: Request, env: Env): Promise<{ email?: string; name?: string; role?: string } | null> {
-  const auth = request.headers.get('Authorization')
-  if (!auth?.startsWith('Bearer ')) return null
-  const token = auth.slice(7)
-
-  try {
-    const res = await fetch(`${env.AUTO_DEV_API_URL}/api/auth/session`, {
-      headers: { Cookie: `__Secure-authjs.session-token=${token}` },
-    })
-    if (!res.ok) return null
-    const data: any = await res.json()
-    return data?.user || null
-  } catch {
-    return null
+function getVerifiedIdentity(request: Request): { email?: string; name?: string; role?: string; plan?: string } | null {
+  const email = request.headers.get('X-Verified-Email')
+  if (!email) return null
+  return {
+    email,
+    name: request.headers.get('X-Verified-Name') || undefined,
+    role: request.headers.get('X-Verified-Role') || undefined,
+    plan: request.headers.get('X-Verified-Plan') || undefined,
   }
 }
 
@@ -150,10 +144,10 @@ export async function handleChat(request: Request, env: Env) {
 
   if (!message) return json({ error: 'message required' }, 400)
 
-  // Verify caller identity from session token — don't trust body
-  const session = await verifySession(request, env)
-  const customerId = session?.email || body.customerId
-  const callerRole = session?.role || body.role
+  // Use verified identity from api.auto.dev proxy headers, fall back to body
+  const verified = getVerifiedIdentity(request)
+  const customerId = verified?.email || body.customerId
+  const callerRole = verified?.role || body.role
 
   if (!customerId) return json({ error: 'Authentication required' }, 401)
 
