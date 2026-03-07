@@ -89,6 +89,19 @@ export async function resolveRequest(request: IRequest, env: Env) {
   return json({ ok: true })
 }
 
+export async function reopenRequest(request: IRequest, env: Env) {
+  const { id } = request.params
+  const raw = await env.SUPPORT_KV.get(`support:${id}`)
+  if (!raw) return json({ error: 'Not found' }, 404)
+
+  const data: SupportRequestData = JSON.parse(raw)
+  data.status = 'escalated'
+  data.updatedAt = new Date().toISOString()
+
+  await env.SUPPORT_KV.put(`support:${id}`, JSON.stringify(data))
+  return json({ ok: true })
+}
+
 export async function mergeRequests(request: IRequest, env: Env) {
   const { id: primaryId } = request.params
   const body: any = await request.json()

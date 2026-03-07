@@ -1,6 +1,6 @@
 import { AutoRouter, cors } from 'itty-router'
 import { handleChat, handleContactAssign, handleRedraft } from './chat'
-import { listRequests, getRequest, adminReply, resolveRequest, mergeRequests } from './requests'
+import { listRequests, getRequest, adminReply, resolveRequest, reopenRequest, mergeRequests } from './requests'
 
 const { preflight, corsify } = cors()
 
@@ -17,6 +17,7 @@ router
   .post('/requests/:id/reply', adminReply)
   .post('/requests/:id/resolve', resolveRequest)
   .post('/requests/:id/redraft', handleRedraft)
+  .post('/requests/:id/reopen', reopenRequest)
   .post('/requests/:id/merge', mergeRequests)
   .get('/health', () => new Response('ok'))
 
